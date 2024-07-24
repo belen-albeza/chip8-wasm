@@ -1,0 +1,11 @@
+body {
+  background: #ccc;
+  display: grid;
+  place-content: center;
+  min-height: 50vh;
+}
+
+#chip8-canvas {
+  background: #000;
+  width: 512px;
+}
