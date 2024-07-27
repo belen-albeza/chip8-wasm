@@ -1,30 +1,14 @@
+mod error;
 mod opcode;
 
 use std::convert::TryFrom;
-use std::error;
-use std::fmt;
 
+pub use error::VmError;
 use opcode::Opcode;
 
 pub const DISPLAY_WIDTH: usize = 64;
 pub const DISPLAY_HEIGHT: usize = 32;
 pub const DISPLAY_LEN: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum VmError {
-    InvalidAddress(u16),
-    InvalidOpcode(u16),
-}
-
-impl fmt::Display for VmError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidAddress(addr) => write!(f, "Invalid address: {:#06x}", addr),
-            Self::InvalidOpcode(opcode) => write!(f, "Invalid opcode: {:#06x}", opcode),
-        }
-    }
-}
-impl error::Error for VmError {}
 
 pub type Result<T> = core::result::Result<T, VmError>;
 
