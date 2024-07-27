@@ -2,7 +2,6 @@ mod error;
 mod opcode;
 
 use std::convert::TryFrom;
-use std::fmt;
 
 pub use error::VmError;
 use opcode::Opcode;
@@ -25,8 +24,8 @@ pub struct Vm {
 }
 
 #[cfg(test)]
-impl fmt::Display for Vm {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for Vm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for y in 0..DISPLAY_HEIGHT {
             for x in 0..DISPLAY_WIDTH {
                 write!(
@@ -160,7 +159,11 @@ impl Vm {
 
     #[inline]
     fn put_pixel(&mut self, x: u8, y: u8) -> bool {
-        let i = y as usize * DISPLAY_WIDTH + x as usize;
+        let x = x as usize % DISPLAY_WIDTH;
+        let y = y as usize % DISPLAY_HEIGHT;
+        println!("Putting pixel at {}, {}", x, y);
+        let i = y * DISPLAY_WIDTH + x;
+
         let erased = self.display[i];
         self.display[i] = !self.display[i];
 
@@ -237,13 +240,14 @@ mod tests {
     fn opcode_display() {
         let rom = [0xd0, 0x14, 0xd0, 0x14, 0xff, 0x81, 0x81, 0xff];
         let mut vm = Vm::new(&rom);
-        vm.i_register = 0x200 + 0x04;
+        vm.i_register = 0x204;
         vm.v_registers[0x0] = 0x01;
         vm.v_registers[0x1] = 0x00;
 
         let mut res = vm.tick();
 
         assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0xf], 0x00);
         assert_eq!(vm.display[1..9], [true; 8]);
         assert_eq!(
@@ -258,7 +262,31 @@ mod tests {
 
         res = vm.tick();
         assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x204);
         assert_eq!(vm.display, [false; DISPLAY_LEN]);
         assert_eq!(vm.v_registers[0xf], 0x01);
+    }
+
+    #[test]
+    fn opcode_display_with_wrap() {
+        let rom = [0xd0, 0x12, 0xff, 0xff];
+        let mut vm = Vm::new(&rom);
+        vm.i_register = 0x202;
+        vm.v_registers[0x0] = 60;
+        vm.v_registers[0x1] = 31;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.display[0..4], [true; 4]);
+        assert_eq!(vm.display[60..64], [true; 4]);
+        assert_eq!(
+            vm.display[0 + 31 * DISPLAY_WIDTH..(4 + 31 * DISPLAY_WIDTH)],
+            [true; 4]
+        );
+        assert_eq!(
+            vm.display[60 + 31 * DISPLAY_WIDTH..(64 + 31 * DISPLAY_WIDTH)],
+            [true; 4]
+        );
     }
 }
