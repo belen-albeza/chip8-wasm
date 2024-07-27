@@ -2,6 +2,7 @@ mod error;
 mod opcode;
 
 use std::convert::TryFrom;
+use std::fmt;
 
 pub use error::VmError;
 use opcode::Opcode;
@@ -21,6 +22,27 @@ pub struct Vm {
     sound: u8,
     v_registers: [u8; 16],
     pub display: [bool; DISPLAY_LEN],
+}
+
+#[cfg(test)]
+impl fmt::Display for Vm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for y in 0..DISPLAY_HEIGHT {
+            for x in 0..DISPLAY_WIDTH {
+                write!(
+                    f,
+                    "{}",
+                    if self.display[y * DISPLAY_WIDTH + x] {
+                        "*"
+                    } else {
+                        " "
+                    }
+                )?;
+            }
+            writeln!(f, "")?;
+        }
+        Ok(())
+    }
 }
 
 impl Vm {
@@ -60,6 +82,7 @@ impl Vm {
             Opcode::LoadVx(x, value) => self.exec_load_vx(x, value)?,
             Opcode::AddVx(x, value) => self.exec_add_vx(x, value)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
+            Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             _ => todo!(),
         };
 
@@ -107,6 +130,41 @@ impl Vm {
     fn exec_load_i(&mut self, addr: u16) -> Result<bool> {
         self.i_register = addr;
         Ok(false)
+    }
+
+    fn exec_display(&mut self, vx: u8, vy: u8, rows: u8) -> Result<bool> {
+        self.v_registers[0xf] = 0x00;
+
+        let sprite_x = self.v_registers[vx as usize];
+        let sprite_y = self.v_registers[vy as usize];
+
+        let addr = self.i_register as usize;
+        let sprite = self.ram[addr..addr + rows as usize].to_vec();
+
+        for row in 0..rows {
+            for col in 0..8 {
+                let pixel = (sprite[row as usize] & (0x80 >> col)) != 0;
+                if !pixel {
+                    continue;
+                }
+
+                let did_erase = self.put_pixel(sprite_x + col, sprite_y + row);
+                if did_erase {
+                    self.v_registers[0xf] = 0x01;
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    #[inline]
+    fn put_pixel(&mut self, x: u8, y: u8) -> bool {
+        let i = y as usize * DISPLAY_WIDTH + x as usize;
+        let erased = self.display[i];
+        self.display[i] = !self.display[i];
+
+        return erased;
     }
 }
 
@@ -173,5 +231,34 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.i_register, 0x0abc);
+    }
+
+    #[test]
+    fn opcode_display() {
+        let rom = [0xd0, 0x14, 0xd0, 0x14, 0xff, 0x81, 0x81, 0xff];
+        let mut vm = Vm::new(&rom);
+        vm.i_register = 0x200 + 0x04;
+        vm.v_registers[0x0] = 0x01;
+        vm.v_registers[0x1] = 0x00;
+
+        let mut res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.v_registers[0xf], 0x00);
+        assert_eq!(vm.display[1..9], [true; 8]);
+        assert_eq!(
+            vm.display[(64 + 1)..(64 + 9)],
+            [true, false, false, false, false, false, false, true]
+        );
+        assert_eq!(
+            vm.display[(64 * 2 + 1)..(64 * 2 + 9)],
+            [true, false, false, false, false, false, false, true]
+        );
+        assert_eq!(vm.display[(64 * 3 + 1)..(64 * 3 + 9)], [true; 8]);
+
+        res = vm.tick();
+        assert!(res.is_ok());
+        assert_eq!(vm.display, [false; DISPLAY_LEN]);
+        assert_eq!(vm.v_registers[0xf], 0x01);
     }
 }
