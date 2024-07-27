@@ -7,13 +7,15 @@ pub const DISPLAY_LEN: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum VmError {
-    InvalidAddress(usize),
+    InvalidAddress(u16),
+    InvalidOpcode(u16),
 }
 
 impl fmt::Display for VmError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidAddress(addr) => write!(f, "Invalid address: {:#06x}", addr),
+            Self::InvalidOpcode(opcode) => write!(f, "Invalid opcode: {:#06x}", opcode),
         }
     }
 }
@@ -48,7 +50,30 @@ impl Vm {
         }
     }
 
-    pub fn run(&self) -> Result<bool> {
-        Ok(true)
+    pub fn run(&mut self) -> Result<bool> {
+        loop {
+            let opcode = self.next_opcode()?;
+            match opcode {
+                _ => return Err(VmError::InvalidOpcode(opcode)),
+            }
+        }
+    }
+
+    fn next_opcode(&mut self) -> Result<u16> {
+        let hi = self.read_byte()?;
+        let lo = self.read_byte()?;
+        let raw_opcode = u16::from_be_bytes([hi, lo]);
+
+        Ok(raw_opcode)
+    }
+
+    fn read_byte(&mut self) -> Result<u8> {
+        let res = self
+            .ram
+            .get(self.pc as usize)
+            .copied()
+            .ok_or(VmError::InvalidAddress(self.pc));
+        self.pc += 1;
+        res
     }
 }

@@ -11,7 +11,10 @@ async function main() {
   setupRomSelector(ROMS);
 
   const emu = await loadRomInEmu(ROMS[0].url);
-  emu.run();
+  let shallHalt = emu.run();
+  if (shallHalt) {
+    console.debug("Chip-8 VM halted");
+  }
 
   const sharedBuffer = new Uint8Array(wasm.memory.buffer);
   const canvas = document.querySelector<HTMLCanvasElement>("#chip8-canvas");

@@ -25,9 +25,15 @@ impl Emu {
     }
 
     #[wasm_bindgen]
-    pub fn run(self) -> Result<()> {
+    pub fn run(&mut self) -> Result<bool> {
         loop {
-            let shall_halt = self.vm.run()?;
+            let res = self.vm.run();
+            let shall_halt = match res {
+                Ok(x) => x,
+                Err(VmError::InvalidOpcode(_)) => true,
+                Err(err) => return Err(Error::from(err)),
+            };
+
             self.update_display_buffer();
 
             if shall_halt {
@@ -35,7 +41,7 @@ impl Emu {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     #[wasm_bindgen]
