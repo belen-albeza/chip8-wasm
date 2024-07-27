@@ -1,7 +1,27 @@
+use std::error;
+use std::fmt;
+
 pub const DISPLAY_WIDTH: usize = 64;
 pub const DISPLAY_HEIGHT: usize = 32;
 pub const DISPLAY_LEN: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum VmError {
+    InvalidAddress(usize),
+}
+
+impl fmt::Display for VmError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidAddress(addr) => write!(f, "Invalid address: {:#06x}", addr),
+        }
+    }
+}
+impl error::Error for VmError {}
+
+pub type Result<T> = core::result::Result<T, VmError>;
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct Vm {
     ram: [u8; 4096],
     pc: u16,
@@ -28,7 +48,7 @@ impl Vm {
         }
     }
 
-    pub fn run(&self) -> Result<bool, String> {
+    pub fn run(&self) -> Result<bool> {
         Ok(true)
     }
 }
