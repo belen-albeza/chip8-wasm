@@ -57,7 +57,8 @@ impl Vm {
         let shall_halt = match opcode {
             Opcode::ClearScreen => self.exec_clear_screen()?,
             Opcode::Jump(addr) => self.exec_jump_absolute(addr)?,
-            Opcode::LoadV(x, value) => self.exec_load_vx(x, value)?,
+            Opcode::LoadVx(x, value) => self.exec_load_vx(x, value)?,
+            Opcode::AddVx(x, value) => self.exec_add_vx(x, value)?,
             _ => todo!(),
         };
 
@@ -96,6 +97,11 @@ impl Vm {
         self.v_registers[x as usize] = value;
         Ok(false)
     }
+
+    fn exec_add_vx(&mut self, x: u8, value: u8) -> Result<bool> {
+        self.v_registers[x as usize] = self.v_registers[x as usize].wrapping_add(value);
+        Ok(false)
+    }
 }
 
 #[cfg(test)]
@@ -127,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn opcode_load_v() {
+    fn opcode_load_vx() {
         let rom = [0x6a, 0xbc];
         let mut vm = Vm::new(&rom);
 
@@ -136,5 +142,18 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0xa], 0xbc);
+    }
+
+    #[test]
+    fn opcode_add_vx() {
+        let rom = [0x7a, 0xbc];
+        let mut vm = Vm::new(&rom);
+        vm.v_registers[0xa] = 0x11;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.v_registers[0xa], 0x11 + 0xbc);
     }
 }
