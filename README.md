@@ -13,6 +13,5 @@ Requirements:
 
 ```
 cd chip8
-wasm-pack build --out-dir ../app/vendor/chip8
+wasm-pack build --target web --out-dir ../app/vendor/chip8
 ```
-
