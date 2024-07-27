@@ -26,9 +26,11 @@ impl Emu {
 
     #[wasm_bindgen]
     pub fn run(&mut self, cycles: usize) -> Result<bool> {
+        let mut shall_halt = false;
+
         for _ in 0..cycles {
             let res = self.vm.tick();
-            let shall_halt = match res {
+            shall_halt = match res {
                 Ok(x) => x,
                 Err(VmError::InvalidOpcode(_)) => true,
                 Err(err) => return Err(Error::from(err)),
@@ -41,7 +43,7 @@ impl Emu {
             }
         }
 
-        Ok(true)
+        Ok(shall_halt)
     }
 
     #[wasm_bindgen]

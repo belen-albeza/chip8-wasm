@@ -3,12 +3,17 @@ import wasmInit, { loadRom, Emu } from "chip8";
 const ROMS = [{ name: "poker.ch8", url: "/roms/poker.ch8" }];
 const DISPLAY_LEN = 64 * 32;
 
+const config = {
+  cyclesPerFrame: 12,
+};
+
 main();
 
 async function main() {
   const wasm = await wasmInit();
 
   setupRomSelector(ROMS);
+  setupConfigPanel();
 
   const emu = await loadRomInEmu(ROMS[0].url);
 
@@ -21,7 +26,7 @@ async function main() {
   const imageData = ctx.createImageData(canvas.width, canvas.height);
 
   const updateCanvas = () => {
-    let shallHalt = emu.run(16);
+    let shallHalt = emu.run(config.cyclesPerFrame);
 
     const outputPointer = Emu.display_buffer();
     const bufferData = sharedBuffer.slice(
@@ -51,6 +56,29 @@ function setupRomSelector(roms: { name: string; url: string }[]) {
 
     selectEl?.appendChild(option);
   }
+}
+
+function setupConfigPanel() {
+  const cyclesInput = document.querySelector(
+    "#chip8-ipf-selector"
+  ) as HTMLInputElement;
+
+  cyclesInput.value = config.cyclesPerFrame.toString();
+  document.addEventListener("change", () => {
+    const cycles = parseInt(cyclesInput.value);
+    config.cyclesPerFrame = cycles;
+    updateCyclesPerSecond();
+  });
+
+  const updateCyclesPerSecond = () => {
+    const cyclesPerSecond = document.querySelector(
+      "#chip8-config-ips"
+    ) as HTMLElement;
+    const count = config.cyclesPerFrame * 60;
+    cyclesPerSecond.textContent = count.toString();
+  };
+
+  updateCyclesPerSecond();
 }
 
 async function fetchRom(url: string) {
