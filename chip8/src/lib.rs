@@ -2,6 +2,7 @@ mod error;
 mod utils;
 mod vm;
 
+use regex::RegexBuilder;
 use wasm_bindgen::prelude::*;
 
 use vm::{Vm, DISPLAY_LEN};
@@ -11,17 +12,36 @@ static mut OUTPUT_BUFFER: [u8; 4 * DISPLAY_LEN] = [0; 4 * DISPLAY_LEN];
 pub use error::{Error, VmError};
 pub type Result<T> = core::result::Result<T, Error>;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Theme {
+    off_color: (u8, u8, u8),
+    on_color: (u8, u8, u8),
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Self {
+            off_color: (0x00, 0x00, 0x00),
+            on_color: (0xff, 0xff, 0xff),
+        }
+    }
+}
+
 #[wasm_bindgen]
 #[derive(Debug, PartialEq)]
 pub struct Emu {
     vm: Vm,
+    theme: Theme,
 }
 
 #[wasm_bindgen]
 impl Emu {
     #[wasm_bindgen(constructor)]
     pub fn new(rom: &[u8]) -> Self {
-        Self { vm: Vm::new(rom) }
+        Self {
+            vm: Vm::new(rom),
+            theme: Theme::default(),
+        }
     }
 
     #[wasm_bindgen]
@@ -46,8 +66,18 @@ impl Emu {
         Ok(shall_halt)
     }
 
-    #[wasm_bindgen]
-    pub fn display_buffer() -> *const u8 {
+    #[wasm_bindgen(js_name=setTheme)]
+    pub fn set_theme(&mut self, off_color: &str, on_color: &str) -> Result<()> {
+        self.theme = Theme {
+            off_color: parse_hex_color(off_color)?,
+            on_color: parse_hex_color(on_color)?,
+        };
+
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name=displayBuffer)]
+    pub fn display_buffer(&self) -> *const u8 {
         let pointer: *const u8;
         unsafe {
             pointer = OUTPUT_BUFFER.as_ptr();
@@ -58,9 +88,11 @@ impl Emu {
 
     fn update_display_buffer(&self) {
         for (i, pixel) in self.vm.display.iter().enumerate() {
-            let r = if *pixel { 0xff } else { 0x00 };
-            let g = if *pixel { 0xff } else { 0x00 };
-            let b = if *pixel { 0xff } else { 0x00 };
+            let (r, g, b) = if *pixel {
+                self.theme.on_color
+            } else {
+                self.theme.off_color
+            };
 
             unsafe {
                 OUTPUT_BUFFER[i * 4 + 0] = r;
@@ -69,6 +101,21 @@ impl Emu {
                 OUTPUT_BUFFER[i * 4 + 3] = 0xff;
             }
         }
+    }
+}
+
+fn parse_hex_color(hex: &str) -> Result<(u8, u8, u8)> {
+    let re = RegexBuilder::new(r"#(?<r>[0-9a-f]{2})(?<g>[0-9a-f]{2})(?<b>[0-9a-f]{2})")
+        .case_insensitive(true)
+        .build()
+        .unwrap();
+    if let Some(caps) = re.captures(hex) {
+        let r = u8::from_str_radix(&caps["r"], 16).map_err(|_| Error::InvalidTheme)?;
+        let g = u8::from_str_radix(&caps["g"], 16).map_err(|_| Error::InvalidTheme)?;
+        let b = u8::from_str_radix(&caps["b"], 16).map_err(|_| Error::InvalidTheme)?;
+        Ok((r, g, b))
+    } else {
+        Err(Error::InvalidTheme)
     }
 }
 
@@ -92,5 +139,10 @@ mod tests {
         let rom = [0_u8; 4096];
         let res = load_rom(&rom);
         assert_eq!(res, Err(Error::InvalidRom));
+    }
+
+    #[test]
+    fn parses_color_from_hex() {
+        assert_eq!(parse_hex_color("#faBAda"), Ok((0xfa, 0xba, 0xda)));
     }
 }
