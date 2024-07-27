@@ -56,6 +56,8 @@ impl Vm {
 
         let shall_halt = match opcode {
             Opcode::ClearScreen => self.exec_clear_screen()?,
+            Opcode::Jump(addr) => self.exec_jump_absolute(addr)?,
+            _ => todo!(),
         };
 
         Ok(shall_halt)
@@ -83,6 +85,11 @@ impl Vm {
         self.display = [false; DISPLAY_LEN];
         Ok(false)
     }
+
+    fn exec_jump_absolute(&mut self, addr: u16) -> Result<bool> {
+        self.pc = addr;
+        Ok(false)
+    }
 }
 
 #[cfg(test)]
@@ -99,5 +106,16 @@ mod tests {
 
         assert!(res.is_ok());
         assert_eq!(vm.display, [false; DISPLAY_LEN]);
+    }
+
+    #[test]
+    fn opcode_jump_absolute() {
+        let rom = [0x1a, 0xbc];
+        let mut vm = Vm::new(&rom);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0xabc);
     }
 }
