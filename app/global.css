@@ -6,6 +6,5 @@ body {
 }
 
 #chip8-canvas {
-  background: #000;
   width: 512px;
 }
