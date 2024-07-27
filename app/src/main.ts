@@ -30,6 +30,8 @@ const THEMES = [
   },
 ];
 
+let animationFrameRequestId: number;
+
 const config = {
   cyclesPerFrame: 12,
   theme: THEMES[0],
@@ -38,16 +40,22 @@ const config = {
 main();
 
 async function main() {
-  const wasm = await wasmInit();
-
-  const emu = await loadRomInEmu(ROMS[0].url);
-
   setupRomSelector(ROMS);
+  startEmulatorWithRom(ROMS[0].url);
+}
+
+async function startEmulatorWithRom(romUrl: string) {
+  if (animationFrameRequestId) {
+    cancelAnimationFrame(animationFrameRequestId);
+  }
+
+  const wasm = await wasmInit();
+  const emu = await loadRomInEmu(romUrl);
+
   setupConfigPanel(emu);
-
   emu.setTheme(config.theme.off, config.theme.on);
-
   const sharedBuffer = new Uint8Array(wasm.memory.buffer);
+
   const canvas = document.querySelector<HTMLCanvasElement>("#chip8-canvas");
   const ctx = canvas?.getContext("2d");
   if (!ctx || !canvas) {
@@ -69,7 +77,7 @@ async function main() {
     if (shallHalt) {
       console.debug("Chip-8 VM halted");
     } else {
-      requestAnimationFrame(updateCanvas);
+      animationFrameRequestId = requestAnimationFrame(updateCanvas);
     }
   };
 
@@ -77,7 +85,9 @@ async function main() {
 }
 
 function setupRomSelector(roms: { name: string; url: string }[]) {
-  const selectEl = document.querySelector("#chip8-rom-selector");
+  const selectEl = document.querySelector<HTMLSelectElement>(
+    "#chip8-rom-selector"
+  );
   for (const { name, url } of roms) {
     const option = new Option();
     option.value = url;
@@ -86,6 +96,11 @@ function setupRomSelector(roms: { name: string; url: string }[]) {
 
     selectEl?.appendChild(option);
   }
+
+  selectEl?.addEventListener("change", () => {
+    let url = selectEl.value;
+    startEmulatorWithRom(url);
+  });
 }
 
 function setupConfigPanel(emu: Emu) {
