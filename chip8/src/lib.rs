@@ -25,9 +25,9 @@ impl Emu {
     }
 
     #[wasm_bindgen]
-    pub fn run(&mut self) -> Result<bool> {
-        loop {
-            let res = self.vm.run();
+    pub fn run(&mut self, cycles: usize) -> Result<bool> {
+        for _ in 0..cycles {
+            let res = self.vm.tick();
             let shall_halt = match res {
                 Ok(x) => x,
                 Err(VmError::InvalidOpcode(_)) => true,

@@ -60,17 +60,6 @@ impl Vm {
         }
     }
 
-    pub fn run(&mut self) -> Result<bool> {
-        loop {
-            let shall_halt = self.tick()?;
-            if shall_halt {
-                break;
-            }
-        }
-
-        Ok(true)
-    }
-
     pub fn tick(&mut self) -> Result<bool> {
         let raw_opcode = self.next_opcode()?;
         let opcode = Opcode::try_from(raw_opcode)?;
@@ -82,7 +71,7 @@ impl Vm {
             Opcode::AddVx(x, value) => self.exec_add_vx(x, value)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
-            _ => todo!(),
+            Opcode::NoOp => false,
         };
 
         Ok(shall_halt)

@@ -11,10 +11,6 @@ async function main() {
   setupRomSelector(ROMS);
 
   const emu = await loadRomInEmu(ROMS[0].url);
-  let shallHalt = emu.run();
-  if (shallHalt) {
-    console.debug("Chip-8 VM halted");
-  }
 
   const sharedBuffer = new Uint8Array(wasm.memory.buffer);
   const canvas = document.querySelector<HTMLCanvasElement>("#chip8-canvas");
@@ -24,23 +20,25 @@ async function main() {
   }
   const imageData = ctx.createImageData(canvas.width, canvas.height);
 
-  updateCanvas(ctx, imageData, sharedBuffer);
-}
+  const updateCanvas = () => {
+    let shallHalt = emu.run(16);
 
-function updateCanvas(
-  ctx: CanvasRenderingContext2D,
-  canvasData: ImageData,
-  buffer: Uint8Array
-) {
-  const outputPointer = Emu.display_buffer();
-  const imageData = buffer.slice(
-    outputPointer,
-    outputPointer + 4 * DISPLAY_LEN
-  );
-  canvasData.data.set(imageData);
-  ctx.putImageData(canvasData, 0, 0);
+    const outputPointer = Emu.display_buffer();
+    const bufferData = sharedBuffer.slice(
+      outputPointer,
+      outputPointer + 4 * DISPLAY_LEN
+    );
+    imageData.data.set(bufferData);
+    ctx.putImageData(imageData, 0, 0);
 
-  requestAnimationFrame(() => updateCanvas(ctx, canvasData, buffer));
+    if (shallHalt) {
+      console.debug("Chip-8 VM halted");
+    } else {
+      requestAnimationFrame(updateCanvas);
+    }
+  };
+
+  updateCanvas();
 }
 
 function setupRomSelector(roms: { name: string; url: string }[]) {
