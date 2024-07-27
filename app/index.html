@@ -20,6 +20,20 @@
               <select id="chip8-rom-selector"></select>
             </label>
           </p>
+          <details open>
+            <summary>Config</summary>
+            <p>
+              <label>Instructions per frame
+                <input type="number" min="1" max="30" value="16" id="chip8-ipf-selector"/>
+              </label>
+              <small>(<span id="chip8-config-ips">0</span> instructions/second)</small>
+            </p>
+            <p>
+              <label>Theme
+                <select id="chip8-config-theme-selector"></select>
+              </label>
+            </p>
+          </details>
         </footer>
       </main>
       <footer>

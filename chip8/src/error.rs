@@ -9,6 +9,7 @@ pub use crate::vm::VmError;
 pub enum Error {
     VmError(VmError),
     InvalidRom,
+    InvalidTheme,
 }
 
 impl fmt::Display for Error {
