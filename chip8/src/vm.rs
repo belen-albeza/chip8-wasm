@@ -16,7 +16,7 @@ pub type Result<T> = core::result::Result<T, VmError>;
 pub struct Vm {
     ram: [u8; 4096],
     pc: u16,
-    idx_register: u16,
+    i_register: u16,
     delay: u8,
     sound: u8,
     v_registers: [u8; 16],
@@ -31,7 +31,7 @@ impl Vm {
         Self {
             ram: memory,
             pc: 0x200,
-            idx_register: 0,
+            i_register: 0,
             delay: 0,
             sound: 0,
             v_registers: [0; 16],
@@ -59,6 +59,7 @@ impl Vm {
             Opcode::Jump(addr) => self.exec_jump_absolute(addr)?,
             Opcode::LoadVx(x, value) => self.exec_load_vx(x, value)?,
             Opcode::AddVx(x, value) => self.exec_add_vx(x, value)?,
+            Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             _ => todo!(),
         };
 
@@ -100,6 +101,11 @@ impl Vm {
 
     fn exec_add_vx(&mut self, x: u8, value: u8) -> Result<bool> {
         self.v_registers[x as usize] = self.v_registers[x as usize].wrapping_add(value);
+        Ok(false)
+    }
+
+    fn exec_load_i(&mut self, addr: u16) -> Result<bool> {
+        self.i_register = addr;
         Ok(false)
     }
 }
@@ -155,5 +161,17 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0xa], 0x11 + 0xbc);
+    }
+
+    #[test]
+    fn opcode_load_i() {
+        let rom = [0xaa, 0xbc];
+        let mut vm = Vm::new(&rom);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.i_register, 0x0abc);
     }
 }
