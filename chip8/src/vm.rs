@@ -94,6 +94,7 @@ where
             Opcode::ShiftL(x, y) => self.exec_shift_left(x, y)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::JumpOffset(addr) => self.exec_jump_offset(addr)?,
+            Opcode::Rand(x, value) => self.exec_rand(x, value)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             Opcode::NoOp => {}
             _ => todo!(),
@@ -276,15 +277,16 @@ where
         self.pc = addr + self.v_registers[0x0] as u16;
         Ok(())
     }
+
+    fn exec_rand(&mut self, vx: u8, value: u8) -> Result<()> {
+        self.v_registers[vx as usize] = (self.randomize)() & value;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn mocked_rand() -> u8 {
-        0x00
-    }
 
     fn any_vm(rom: &[u8]) -> Vm<fn() -> u8> {
         Vm::new(&rom, || 0x00)
@@ -633,5 +635,17 @@ mod tests {
 
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x2ab);
+    }
+
+    #[test]
+    fn opcode_rand() {
+        let rom = [0xc0, 0x0f];
+        let mut vm = Vm::new(&rom, || 0b1010_1010);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.v_registers[0x0], 0b0000_1010);
     }
 }

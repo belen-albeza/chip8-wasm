@@ -39,7 +39,7 @@ impl Emu {
     #[wasm_bindgen(constructor)]
     pub fn new(rom: &[u8]) -> Self {
         Self {
-            vm: Vm::new(rom, || 0x00),
+            vm: Vm::new(rom, || rand::random()),
             theme: Theme::default(),
         }
     }
