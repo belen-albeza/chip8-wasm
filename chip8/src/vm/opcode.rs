@@ -23,6 +23,7 @@ pub enum Opcode {
     ShiftL(u8, u8),
     LoadI(u16),
     JumpOffset(u16),
+    Rand(u8, u8),
     Display(u8, u8, u8),
 }
 
@@ -60,6 +61,7 @@ impl TryFrom<u16> for Opcode {
             (0x8, x, y, 0xe) => Ok(Self::ShiftL(x, y)),
             (0xa, _, _, _) => Ok(Self::LoadI(nnn)),
             (0xb, _, _, _) => Ok(Self::JumpOffset(nnn)),
+            (0xc, x, _, _) => Ok(Self::Rand(x, kk)),
             (0xd, x, y, n) => Ok(Self::Display(x, y, n)),
             _ => Err(VmError::InvalidOpcode(value)),
         }
@@ -91,6 +93,7 @@ mod tests {
         assert_eq!(Opcode::try_from(0x8abe), Ok(Opcode::ShiftL(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0xaabc), Ok(Opcode::LoadI(0x0abc)));
         assert_eq!(Opcode::try_from(0xbabc), Ok(Opcode::JumpOffset(0x0abc)));
+        assert_eq!(Opcode::try_from(0xcabc), Ok(Opcode::Rand(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0xdabc), Ok(Opcode::Display(0xa, 0xb, 0xc)));
     }
 }

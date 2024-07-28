@@ -13,7 +13,10 @@ pub const DISPLAY_LEN: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 pub type Result<T> = core::result::Result<T, VmError>;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Vm {
+pub struct Vm<R>
+where
+    R: Fn() -> u8,
+{
     ram: [u8; 4096],
     pc: u16,
     i_register: u16,
@@ -21,10 +24,14 @@ pub struct Vm {
     sound: u8,
     v_registers: [u8; 16],
     pub display: [bool; DISPLAY_LEN],
+    randomize: R,
 }
 
 #[cfg(test)]
-impl std::fmt::Display for Vm {
+impl<R> std::fmt::Display for Vm<R>
+where
+    R: Fn() -> u8,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for y in 0..DISPLAY_HEIGHT {
             for x in 0..DISPLAY_WIDTH {
@@ -44,8 +51,11 @@ impl std::fmt::Display for Vm {
     }
 }
 
-impl Vm {
-    pub fn new(rom: &[u8]) -> Self {
+impl<R> Vm<R>
+where
+    R: Fn() -> u8,
+{
+    pub fn new(rom: &[u8], randomize: R) -> Self {
         let mut memory = [0; 4096];
         memory[0x200..0x200 + rom.len()].copy_from_slice(rom);
 
@@ -57,6 +67,7 @@ impl Vm {
             sound: 0,
             v_registers: [0; 16],
             display: [false; DISPLAY_LEN],
+            randomize,
         }
     }
 
@@ -83,6 +94,7 @@ impl Vm {
             Opcode::ShiftL(x, y) => self.exec_shift_left(x, y)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::JumpOffset(addr) => self.exec_jump_offset(addr)?,
+            Opcode::Rand(x, value) => self.exec_rand(x, value)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             Opcode::NoOp => {}
             _ => todo!(),
@@ -265,16 +277,25 @@ impl Vm {
         self.pc = addr + self.v_registers[0x0] as u16;
         Ok(())
     }
+
+    fn exec_rand(&mut self, vx: u8, value: u8) -> Result<()> {
+        self.v_registers[vx as usize] = (self.randomize)() & value;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn any_vm(rom: &[u8]) -> Vm<fn() -> u8> {
+        Vm::new(&rom, || 0x00)
+    }
+
     #[test]
     fn opcode_clear_screen() {
         let rom = [0x00, 0xe0];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.display = [true; DISPLAY_LEN];
 
         let res = vm.tick();
@@ -287,7 +308,7 @@ mod tests {
     #[test]
     fn opcode_jump_absolute() {
         let rom = [0x1a, 0xbc];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
 
         let res = vm.tick();
 
@@ -298,7 +319,7 @@ mod tests {
     #[test]
     fn opcode_load_vx() {
         let rom = [0x6a, 0xbc];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
 
         let res = vm.tick();
 
@@ -310,7 +331,7 @@ mod tests {
     #[test]
     fn opcode_add_vx() {
         let rom = [0x7a, 0xbc];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0xa] = 0x11;
 
         let res = vm.tick();
@@ -323,7 +344,7 @@ mod tests {
     #[test]
     fn opcode_load_i() {
         let rom = [0xaa, 0xbc];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
 
         let res = vm.tick();
 
@@ -335,7 +356,7 @@ mod tests {
     #[test]
     fn opcode_display() {
         let rom = [0xd0, 0x14, 0xd0, 0x14, 0xff, 0x81, 0x81, 0xff];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.i_register = 0x204;
         vm.v_registers[0x0] = 0x01;
         vm.v_registers[0x1] = 0x00;
@@ -366,7 +387,7 @@ mod tests {
     #[test]
     fn opcode_display_with_wrap() {
         let rom = [0xd0, 0x12, 0xff, 0xff];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.i_register = 0x202;
         vm.v_registers[0x0] = 60;
         vm.v_registers[0x1] = 31;
@@ -389,7 +410,7 @@ mod tests {
     #[test]
     fn opcode_skip_if_equal() {
         let rom = [0x30, 0xab];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0xab;
 
         let mut res = vm.tick();
@@ -408,7 +429,7 @@ mod tests {
     #[test]
     fn opcode_skip_if_not_equal() {
         let rom = [0x40, 0xab];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x00;
 
         let mut res = vm.tick();
@@ -427,7 +448,7 @@ mod tests {
     #[test]
     fn opcode_skip_if_equal_vx_vy() {
         let rom = [0x50, 0x10];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x00;
         vm.v_registers[0x1] = 0x00;
 
@@ -447,7 +468,7 @@ mod tests {
     #[test]
     fn opcode_load_vx_vy() {
         let rom = [0x80, 0x10];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x1] = 0xab;
 
         let res = vm.tick();
@@ -460,7 +481,7 @@ mod tests {
     #[test]
     fn opcode_or_vx_vy() {
         let rom = [0x80, 0x11];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x0f;
         vm.v_registers[0x1] = 0b_0101_0101;
 
@@ -474,7 +495,7 @@ mod tests {
     #[test]
     fn opcode_and_vx_vy() {
         let rom = [0x80, 0x12];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x0f;
         vm.v_registers[0x1] = 0b_0101_0101;
 
@@ -488,7 +509,7 @@ mod tests {
     #[test]
     fn opcode_xor_vx_vy() {
         let rom = [0x80, 0x13];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x0f;
         vm.v_registers[0x1] = 0b_0101_0101;
 
@@ -502,7 +523,7 @@ mod tests {
     #[test]
     fn opcode_add_vx_vy() {
         let rom = [0x80, 0x14];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x02;
         vm.v_registers[0x1] = 0x01;
 
@@ -517,7 +538,7 @@ mod tests {
     #[test]
     fn opcode_add_vx_vy_with_carry() {
         let rom = [0x80, 0x14];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0xff;
         vm.v_registers[0x1] = 0x01;
 
@@ -532,7 +553,7 @@ mod tests {
     #[test]
     fn opcode_sub_vx_vy() {
         let rom = [0x80, 0x15];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x03;
         vm.v_registers[0x1] = 0x01;
 
@@ -547,7 +568,7 @@ mod tests {
     #[test]
     fn opcode_sub_vx_vy_with_borrow() {
         let rom = [0x80, 0x15];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x00;
         vm.v_registers[0x1] = 0x01;
 
@@ -562,7 +583,7 @@ mod tests {
     #[test]
     fn opcode_shift_right() {
         let rom = [0x80, 0x16];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x00;
         vm.v_registers[0x1] = 0b_0000_0011;
 
@@ -577,7 +598,7 @@ mod tests {
     #[test]
     fn opcode_subn_vy_vx() {
         let rom = [0x80, 0x17];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x01;
         vm.v_registers[0x1] = 0x03;
 
@@ -592,7 +613,7 @@ mod tests {
     #[test]
     fn opcode_shift_left() {
         let rom = [0x80, 0x1e];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0x00;
         vm.v_registers[0x1] = 0b_1000_0001;
 
@@ -607,12 +628,24 @@ mod tests {
     #[test]
     fn opcode_jump_offset() {
         let rom = [0xb2, 0x00];
-        let mut vm = Vm::new(&rom);
+        let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0xab;
 
         let res = vm.tick();
 
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x2ab);
+    }
+
+    #[test]
+    fn opcode_rand() {
+        let rom = [0xc0, 0x0f];
+        let mut vm = Vm::new(&rom, || 0b1010_1010);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.v_registers[0x0], 0b0000_1010);
     }
 }
