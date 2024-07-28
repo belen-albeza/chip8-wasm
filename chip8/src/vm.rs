@@ -78,6 +78,7 @@ impl Vm {
             Opcode::Xor(x, y) => self.exec_xor_vx_vy(x, y)?,
             Opcode::Add(x, y) => self.exec_add_vx_vy(x, y)?,
             Opcode::Sub(x, y) => self.exec_sub_vx_vy(x, y)?,
+            Opcode::ShiftR(x, y) => self.exec_shift_right(x, y)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             Opcode::NoOp => {}
@@ -226,6 +227,15 @@ impl Vm {
             self.v_registers[vx as usize].overflowing_sub(self.v_registers[vy as usize]);
         self.v_registers[vx as usize] = value;
         self.v_registers[0xf] = if overflow { 0x00 } else { 0x01 };
+
+        Ok(())
+    }
+
+    fn exec_shift_right(&mut self, vx: u8, vy: u8) -> Result<()> {
+        let y = self.v_registers[vy as usize];
+        let shifted_out = y & 0b0000_0001;
+        self.v_registers[vx as usize] = y >> 1;
+        self.v_registers[0xf] = shifted_out;
 
         Ok(())
     }
@@ -521,5 +531,20 @@ mod tests {
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0x0], 0xff);
         assert_eq!(vm.v_registers[0xf], 0x00);
+    }
+
+    #[test]
+    fn opcode_shift_right() {
+        let rom = [0x80, 0x16];
+        let mut vm = Vm::new(&rom);
+        vm.v_registers[0x0] = 0x00;
+        vm.v_registers[0x1] = 0b_0000_0011;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.v_registers[0x0], 0x01);
+        assert_eq!(vm.v_registers[0xf], 0x01);
     }
 }
