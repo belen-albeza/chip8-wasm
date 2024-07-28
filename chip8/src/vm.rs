@@ -72,6 +72,7 @@ impl Vm {
             Opcode::SkipIfNotEq(x, value) => self.exec_skip_if_not_equal(x, value)?,
             Opcode::SkipEqVxVy(x, y) => self.exec_skip_if_equal_vx_vy(x, y)?,
             Opcode::AddVx(x, value) => self.exec_add_vx(x, value)?,
+            Opcode::LoadVxVy(x, y) => self.exec_load_vx_vy(x, y)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             Opcode::NoOp => {}
@@ -183,6 +184,11 @@ impl Vm {
             self.pc += 2;
         }
 
+        Ok(())
+    }
+
+    fn exec_load_vx_vy(&mut self, vx: u8, vy: u8) -> Result<()> {
+        self.v_registers[vx as usize] = self.v_registers[vy as usize];
         Ok(())
     }
 }
@@ -362,5 +368,18 @@ mod tests {
 
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
+    }
+
+    #[test]
+    fn opcode_load_vx_vy() {
+        let rom = [0x80, 0x10];
+        let mut vm = Vm::new(&rom);
+        vm.v_registers[0x1] = 0xab;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.v_registers[0x0], 0xab);
     }
 }
