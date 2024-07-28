@@ -82,6 +82,7 @@ impl Vm {
             Opcode::SubN(x, y) => self.exec_subn_vy_vx(x, y)?,
             Opcode::ShiftL(x, y) => self.exec_shift_left(x, y)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
+            Opcode::JumpOffset(addr) => self.exec_jump_offset(addr)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             Opcode::NoOp => {}
             _ => todo!(),
@@ -257,6 +258,11 @@ impl Vm {
         self.v_registers[vx as usize] = y << 1;
         self.v_registers[0xf] = shifted_out;
 
+        Ok(())
+    }
+
+    fn exec_jump_offset(&mut self, addr: u16) -> Result<()> {
+        self.pc = addr + self.v_registers[0x0] as u16;
         Ok(())
     }
 }
@@ -596,5 +602,17 @@ mod tests {
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0x0], 0x02);
         assert_eq!(vm.v_registers[0xf], 0x01);
+    }
+
+    #[test]
+    fn opcode_jump_offset() {
+        let rom = [0xb2, 0x00];
+        let mut vm = Vm::new(&rom);
+        vm.v_registers[0x0] = 0xab;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x2ab);
     }
 }
