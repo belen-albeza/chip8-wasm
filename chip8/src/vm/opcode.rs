@@ -13,6 +13,7 @@ pub enum Opcode {
     LoadVx(u8, u8),
     AddVx(u8, u8),
     LoadVxVy(u8, u8),
+    OrVxVy(u8, u8),
     LoadI(u16),
     Display(u8, u8, u8),
 }
@@ -41,6 +42,7 @@ impl TryFrom<u16> for Opcode {
             (0x6, x, _, _) => Ok(Self::LoadVx(x, kk)),
             (0x7, x, _, _) => Ok(Self::AddVx(x, kk)),
             (0x8, x, y, 0) => Ok(Self::LoadVxVy(x, y)),
+            (0x8, x, y, 1) => Ok(Self::OrVxVy(x, y)),
             (0xa, _, _, _) => Ok(Self::LoadI(nnn)),
             (0xd, x, y, n) => Ok(Self::Display(x, y, n)),
             _ => Err(VmError::InvalidOpcode(value)),
@@ -63,6 +65,7 @@ mod tests {
         assert_eq!(Opcode::try_from(0x6abc), Ok(Opcode::LoadVx(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0x7abc), Ok(Opcode::AddVx(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0x8ab0), Ok(Opcode::LoadVxVy(0xa, 0xb)));
+        assert_eq!(Opcode::try_from(0x8ab1), Ok(Opcode::OrVxVy(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0xaabc), Ok(Opcode::LoadI(0x0abc)));
         assert_eq!(Opcode::try_from(0xdabc), Ok(Opcode::Display(0xa, 0xb, 0xc)));
     }
