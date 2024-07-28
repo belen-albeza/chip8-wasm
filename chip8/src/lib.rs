@@ -86,6 +86,35 @@ impl Emu {
         pointer
     }
 
+    #[wasm_bindgen(js_name=updateKeyState)]
+    pub fn update_key_state(&mut self, key_code: &str, value: bool) -> Result<()> {
+        let mapped_key = match key_code {
+            "Digit1" => Some(0x1),
+            "Digit2" => Some(0x2),
+            "Digit3" => Some(0x3),
+            "Digit4" => Some(0xc),
+            "KeyQ" => Some(0x4),
+            "KeyW" => Some(0x5),
+            "KeyE" => Some(0x6),
+            "KeyR" => Some(0xd),
+            "KeyA" => Some(0x7),
+            "KeyS" => Some(0x8),
+            "KeyD" => Some(0x9),
+            "KeyF" => Some(0xe),
+            "KeyZ" => Some(0xa),
+            "KeyX" => Some(0x0),
+            "KeyC" => Some(0xb),
+            "KeyV" => Some(0xf),
+            _ => None,
+        };
+
+        if let Some(key) = mapped_key {
+            self.vm.set_key(key, value)?;
+        }
+
+        Ok(())
+    }
+
     fn update_display_buffer(&self) {
         for (i, pixel) in self.vm.display.iter().enumerate() {
             let (r, g, b) = if *pixel {

@@ -25,6 +25,7 @@ where
     v_registers: [u8; 16],
     pub display: [bool; DISPLAY_LEN],
     randomize: R,
+    pub keys: [bool; 16],
 }
 
 #[cfg(test)]
@@ -67,7 +68,17 @@ where
             sound: 0,
             v_registers: [0; 16],
             display: [false; DISPLAY_LEN],
+            keys: [false; 16],
             randomize,
+        }
+    }
+
+    pub fn set_key(&mut self, key: u8, value: bool) -> Result<()> {
+        if let Some(k) = self.keys.get_mut(key as usize) {
+            *k = value;
+            Ok(())
+        } else {
+            Err(VmError::InvalidKey(key))
         }
     }
 
@@ -290,6 +301,15 @@ mod tests {
 
     fn any_vm(rom: &[u8]) -> Vm<fn() -> u8> {
         Vm::new(&rom, || 0x00)
+    }
+
+    #[test]
+    fn set_key_updates_value() {
+        let mut vm = any_vm(&[]);
+        let res = vm.set_key(0xf, true);
+
+        assert!(res.is_ok());
+        assert_eq!(vm.keys[0xf], true);
     }
 
     #[test]

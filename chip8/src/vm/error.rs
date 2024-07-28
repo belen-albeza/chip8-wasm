@@ -5,6 +5,7 @@ use std::fmt;
 pub enum VmError {
     InvalidAddress(u16),
     InvalidOpcode(u16),
+    InvalidKey(u8),
 }
 
 impl fmt::Display for VmError {
@@ -12,6 +13,7 @@ impl fmt::Display for VmError {
         match self {
             Self::InvalidAddress(addr) => write!(f, "Invalid address: {:#06x}", addr),
             Self::InvalidOpcode(opcode) => write!(f, "Invalid opcode: {:#06x}", opcode),
+            Self::InvalidKey(id) => write!(f, "Invalid key: {:#04x}", id),
         }
     }
 }

@@ -31,6 +31,8 @@ const THEMES = [
 ];
 
 let animationFrameRequestId: number;
+const keyDownController = new AbortController();
+const keyUpController = new AbortController();
 
 const config = {
   cyclesPerFrame: 12,
@@ -47,6 +49,8 @@ async function main() {
 async function startEmulatorWithRom(romUrl: string) {
   if (animationFrameRequestId) {
     cancelAnimationFrame(animationFrameRequestId);
+    keyDownController.abort();
+    keyUpController.abort();
   }
 
   const wasm = await wasmInit();
@@ -54,8 +58,24 @@ async function startEmulatorWithRom(romUrl: string) {
 
   setupConfigPanel(emu);
   emu.setTheme(config.theme.off, config.theme.on);
-  const sharedBuffer = new Uint8Array(wasm.memory.buffer);
 
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      emu.updateKeyState(event.code, true);
+    },
+    { signal: keyDownController.signal }
+  );
+
+  document.addEventListener(
+    "keyup",
+    (event) => {
+      emu.updateKeyState(event.code, false);
+    },
+    { signal: keyUpController.signal }
+  );
+
+  const sharedBuffer = new Uint8Array(wasm.memory.buffer);
   const canvas = document.querySelector<HTMLCanvasElement>("#chip8-canvas");
   const ctx = canvas?.getContext("2d");
   if (!ctx || !canvas) {
