@@ -20,6 +20,7 @@ pub enum Opcode {
     Sub(u8, u8),
     ShiftR(u8, u8),
     SubN(u8, u8),
+    ShiftL(u8, u8),
     LoadI(u16),
     Display(u8, u8, u8),
 }
@@ -47,14 +48,15 @@ impl TryFrom<u16> for Opcode {
             (0x5, x, y, 0) => Ok(Self::SkipEqVxVy(x, y)),
             (0x6, x, _, _) => Ok(Self::LoadVx(x, kk)),
             (0x7, x, _, _) => Ok(Self::AddVx(x, kk)),
-            (0x8, x, y, 0) => Ok(Self::LoadVxVy(x, y)),
-            (0x8, x, y, 1) => Ok(Self::Or(x, y)),
-            (0x8, x, y, 2) => Ok(Self::And(x, y)),
-            (0x8, x, y, 3) => Ok(Self::Xor(x, y)),
-            (0x8, x, y, 4) => Ok(Self::Add(x, y)),
-            (0x8, x, y, 5) => Ok(Self::Sub(x, y)),
-            (0x8, x, y, 6) => Ok(Self::ShiftR(x, y)),
-            (0x8, x, y, 7) => Ok(Self::SubN(x, y)),
+            (0x8, x, y, 0x0) => Ok(Self::LoadVxVy(x, y)),
+            (0x8, x, y, 0x1) => Ok(Self::Or(x, y)),
+            (0x8, x, y, 0x2) => Ok(Self::And(x, y)),
+            (0x8, x, y, 0x3) => Ok(Self::Xor(x, y)),
+            (0x8, x, y, 0x4) => Ok(Self::Add(x, y)),
+            (0x8, x, y, 0x5) => Ok(Self::Sub(x, y)),
+            (0x8, x, y, 0x6) => Ok(Self::ShiftR(x, y)),
+            (0x8, x, y, 0x7) => Ok(Self::SubN(x, y)),
+            (0x8, x, y, 0xe) => Ok(Self::ShiftL(x, y)),
             (0xa, _, _, _) => Ok(Self::LoadI(nnn)),
             (0xd, x, y, n) => Ok(Self::Display(x, y, n)),
             _ => Err(VmError::InvalidOpcode(value)),
@@ -84,6 +86,7 @@ mod tests {
         assert_eq!(Opcode::try_from(0x8ab5), Ok(Opcode::Sub(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0x8ab6), Ok(Opcode::ShiftR(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0x8ab7), Ok(Opcode::SubN(0xa, 0xb)));
+        assert_eq!(Opcode::try_from(0x8abe), Ok(Opcode::ShiftL(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0xaabc), Ok(Opcode::LoadI(0x0abc)));
         assert_eq!(Opcode::try_from(0xdabc), Ok(Opcode::Display(0xa, 0xb, 0xc)));
     }
