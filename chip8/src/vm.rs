@@ -76,6 +76,7 @@ impl Vm {
             Opcode::Or(x, y) => self.exec_or_vx_vy(x, y)?,
             Opcode::And(x, y) => self.exec_and_vx_vy(x, y)?,
             Opcode::Xor(x, y) => self.exec_xor_vx_vy(x, y)?,
+            Opcode::Add(x, y) => self.exec_add_vx_vy(x, y)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             Opcode::NoOp => {}
@@ -207,6 +208,15 @@ impl Vm {
 
     fn exec_xor_vx_vy(&mut self, vx: u8, vy: u8) -> Result<()> {
         self.v_registers[vx as usize] ^= self.v_registers[vy as usize];
+        Ok(())
+    }
+
+    fn exec_add_vx_vy(&mut self, vx: u8, vy: u8) -> Result<()> {
+        let (value, carry) =
+            self.v_registers[vx as usize].overflowing_add(self.v_registers[vy as usize]);
+        self.v_registers[vx as usize] = value;
+        self.v_registers[0xf] = if carry { 0x01 } else { 0x00 };
+
         Ok(())
     }
 }
@@ -441,5 +451,35 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0x0], 0b_0101_1010);
+    }
+
+    #[test]
+    fn opcode_add_vx_vy() {
+        let rom = [0x80, 0x14];
+        let mut vm = Vm::new(&rom);
+        vm.v_registers[0x0] = 0x02;
+        vm.v_registers[0x1] = 0x01;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.v_registers[0x0], 0x03);
+        assert_eq!(vm.v_registers[0xf], 0x00);
+    }
+
+    #[test]
+    fn opcode_add_vx_vy_with_carry() {
+        let rom = [0x80, 0x14];
+        let mut vm = Vm::new(&rom);
+        vm.v_registers[0x0] = 0xff;
+        vm.v_registers[0x1] = 0x01;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.v_registers[0x0], 0x00);
+        assert_eq!(vm.v_registers[0xf], 0x01);
     }
 }
