@@ -107,6 +107,7 @@ where
             Opcode::JumpOffset(addr) => self.exec_jump_offset(addr)?,
             Opcode::Rand(x, value) => self.exec_rand(x, value)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
+            Opcode::SkipIfKey(x) => self.exec_skip_if_key(x)?,
             Opcode::NoOp => {}
             _ => todo!(),
         };
@@ -292,6 +293,19 @@ where
     fn exec_rand(&mut self, vx: u8, value: u8) -> Result<()> {
         self.v_registers[vx as usize] = (self.randomize)() & value;
         Ok(())
+    }
+
+    fn exec_skip_if_key(&mut self, vx: u8) -> Result<()> {
+        let key = self.v_registers[vx as usize];
+        match self.keys.get(key as usize) {
+            Some(state) => {
+                if *state {
+                    self.pc += 2;
+                }
+                Ok(())
+            }
+            None => Err(VmError::InvalidKey(key)),
+        }
     }
 }
 
@@ -667,5 +681,25 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0x0], 0b0000_1010);
+    }
+
+    #[test]
+    fn opcode_skip_if_key() {
+        let rom = [0xe0, 0x9e];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0xa;
+        vm.keys[0xa] = true;
+
+        let mut res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x204);
+
+        vm.pc = 0x200;
+        vm.keys[0xa] = false;
+        res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
     }
 }
