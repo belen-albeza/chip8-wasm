@@ -70,6 +70,7 @@ impl Vm {
             Opcode::LoadVx(x, value) => self.exec_load_vx(x, value)?,
             Opcode::SkipIfEq(x, value) => self.exec_skip_if_equal(x, value)?,
             Opcode::SkipIfNotEq(x, value) => self.exec_skip_if_not_equal(x, value)?,
+            Opcode::SkipEqVxVy(x, y) => self.exec_skip_if_equal_vx_vy(x, y)?,
             Opcode::AddVx(x, value) => self.exec_add_vx(x, value)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
@@ -171,6 +172,14 @@ impl Vm {
 
     fn exec_skip_if_not_equal(&mut self, vx: u8, value: u8) -> Result<()> {
         if self.v_registers[vx as usize] != value {
+            self.pc += 2;
+        }
+
+        Ok(())
+    }
+
+    fn exec_skip_if_equal_vx_vy(&mut self, vx: u8, vy: u8) -> Result<()> {
+        if self.v_registers[vx as usize] == self.v_registers[vy as usize] {
             self.pc += 2;
         }
 
@@ -321,6 +330,26 @@ mod tests {
         let rom = [0x40, 0xab];
         let mut vm = Vm::new(&rom);
         vm.v_registers[0x0] = 0x00;
+
+        let mut res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x204);
+
+        vm.pc = 0x200;
+        vm.v_registers[0x0] = 0xab;
+        res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+    }
+
+    #[test]
+    fn opcode_skip_if_equal_vx_vy() {
+        let rom = [0x50, 0x10];
+        let mut vm = Vm::new(&rom);
+        vm.v_registers[0x0] = 0x00;
+        vm.v_registers[0x1] = 0x00;
 
         let mut res = vm.tick();
 
