@@ -30,7 +30,7 @@ impl Default for Theme {
 #[wasm_bindgen]
 #[derive(Debug, PartialEq)]
 pub struct Emu {
-    vm: Vm,
+    vm: Vm<fn() -> u8>,
     theme: Theme,
 }
 
@@ -39,7 +39,7 @@ impl Emu {
     #[wasm_bindgen(constructor)]
     pub fn new(rom: &[u8]) -> Self {
         Self {
-            vm: Vm::new(rom),
+            vm: Vm::new(rom, || 0x00),
             theme: Theme::default(),
         }
     }
