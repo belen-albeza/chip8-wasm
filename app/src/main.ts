@@ -1,6 +1,9 @@
 import wasmInit, { loadRom, Emu } from "chip8";
 
-const ROMS = [{ name: "poker.ch8", url: "/roms/poker.ch8" }];
+const ROMS = [
+  { name: "poker.ch8", url: "/roms/poker.ch8" },
+  { name: "wait_for_key.ch8", url: "/roms/wait_for_key.ch8" },
+];
 const DISPLAY_LEN = 64 * 32;
 const THEMES = [
   {
@@ -31,8 +34,8 @@ const THEMES = [
 ];
 
 let animationFrameRequestId: number;
-const keyDownController = new AbortController();
-const keyUpController = new AbortController();
+let keyDownController = new AbortController();
+let keyUpController = new AbortController();
 
 const config = {
   cyclesPerFrame: 12,
@@ -51,6 +54,9 @@ async function startEmulatorWithRom(romUrl: string) {
     cancelAnimationFrame(animationFrameRequestId);
     keyDownController.abort();
     keyUpController.abort();
+
+    keyDownController = new AbortController();
+    keyUpController = new AbortController();
   }
 
   const wasm = await wasmInit();
