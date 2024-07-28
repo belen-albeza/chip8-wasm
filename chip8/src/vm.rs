@@ -23,8 +23,13 @@ where
     delay: u8,
     sound: u8,
     v_registers: [u8; 16],
-    pub display: [bool; DISPLAY_LEN],
     randomize: R,
+
+    is_waiting: bool,
+    vx_after_wait: u8,
+
+    pub display: [bool; DISPLAY_LEN],
+    keys: [bool; 16],
 }
 
 #[cfg(test)]
@@ -67,11 +72,31 @@ where
             sound: 0,
             v_registers: [0; 16],
             display: [false; DISPLAY_LEN],
+            keys: [false; 16],
             randomize,
+            is_waiting: false,
+            vx_after_wait: 0x0,
+        }
+    }
+
+    pub fn set_key(&mut self, key: u8, value: bool) -> Result<()> {
+        if let Some(k) = self.keys.get_mut(key as usize) {
+            *k = value;
+            if value && self.is_waiting {
+                self.is_waiting = false;
+                self.v_registers[self.vx_after_wait as usize] = key;
+            }
+            Ok(())
+        } else {
+            Err(VmError::InvalidKey(key))
         }
     }
 
     pub fn tick(&mut self) -> Result<()> {
+        if self.is_waiting {
+            return Ok(());
+        }
+
         let raw_opcode = self.next_opcode()?;
         let opcode = Opcode::try_from(raw_opcode)?;
 
@@ -96,6 +121,9 @@ where
             Opcode::JumpOffset(addr) => self.exec_jump_offset(addr)?,
             Opcode::Rand(x, value) => self.exec_rand(x, value)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
+            Opcode::SkipIfKey(x) => self.exec_skip_if_key(x)?,
+            Opcode::SkipIfNotKey(x) => self.exec_skip_if_not_key(x)?,
+            Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
             Opcode::NoOp => {}
             _ => todo!(),
         };
@@ -282,6 +310,38 @@ where
         self.v_registers[vx as usize] = (self.randomize)() & value;
         Ok(())
     }
+
+    fn exec_skip_if_key(&mut self, vx: u8) -> Result<()> {
+        let state = self.get_vx_key(vx)?;
+        if state {
+            self.pc += 2;
+        }
+        Ok(())
+    }
+
+    fn exec_skip_if_not_key(&mut self, vx: u8) -> Result<()> {
+        let state = self.get_vx_key(vx)?;
+        if !state {
+            self.pc += 2;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn get_vx_key(&self, vx: u8) -> Result<bool> {
+        let key = self.v_registers[vx as usize];
+        self.keys
+            .get(key as usize)
+            .copied()
+            .ok_or(VmError::InvalidKey(key))
+    }
+
+    fn exec_wait_for_key(&mut self, vx: u8) -> Result<()> {
+        self.vx_after_wait = vx;
+        self.is_waiting = true;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -290,6 +350,40 @@ mod tests {
 
     fn any_vm(rom: &[u8]) -> Vm<fn() -> u8> {
         Vm::new(&rom, || 0x00)
+    }
+
+    #[test]
+    fn set_key_updates_value() {
+        let mut vm = any_vm(&[]);
+        let res = vm.set_key(0xf, true);
+
+        assert!(res.is_ok());
+        assert_eq!(vm.keys[0xf], true);
+    }
+
+    #[test]
+    fn does_not_tick_when_waiting() {
+        let mut vm = any_vm(&[0x00, 0xe0]);
+        vm.is_waiting = true;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x200);
+    }
+
+    #[test]
+    fn stops_wait_and_loads_vx_after_key_down() {
+        let mut vm = any_vm(&[]);
+        vm.is_waiting = true;
+        vm.vx_after_wait = 0xb;
+
+        let _ = vm.set_key(0xa, false);
+        assert_eq!(vm.is_waiting, true);
+
+        let _ = vm.set_key(0xa, true);
+        assert_eq!(vm.is_waiting, false);
+        assert_eq!(vm.v_registers[0xb], 0xa);
     }
 
     #[test]
@@ -647,5 +741,60 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0x0], 0b0000_1010);
+    }
+
+    #[test]
+    fn opcode_skip_if_key() {
+        let rom = [0xe0, 0x9e];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0xa;
+        vm.keys[0xa] = true;
+
+        let mut res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x204);
+
+        vm.pc = 0x200;
+        vm.keys[0xa] = false;
+        res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+    }
+
+    #[test]
+    fn opcode_skip_if_not_key() {
+        let rom = [0xe0, 0xa1];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0xa;
+        vm.keys[0xa] = false;
+
+        let mut res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x204);
+
+        vm.pc = 0x200;
+        vm.keys[0xa] = true;
+        res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+    }
+
+    #[test]
+    fn opcode_wait_for_key() {
+        let rom = [0xf0, 0x0a];
+        let mut vm = any_vm(&rom);
+
+        let res = vm.tick();
+        assert!(res.is_ok());
+        assert_eq!(vm.is_waiting, true);
+        assert_eq!(vm.pc, 0x202);
+
+        let _ = vm.set_key(0xa, true);
+        assert_eq!(vm.is_waiting, false);
+        assert_eq!(vm.v_registers[0x0], 0xa);
     }
 }

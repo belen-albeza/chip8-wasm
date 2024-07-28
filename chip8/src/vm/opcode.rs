@@ -25,6 +25,9 @@ pub enum Opcode {
     JumpOffset(u16),
     Rand(u8, u8),
     Display(u8, u8, u8),
+    SkipIfKey(u8),
+    SkipIfNotKey(u8),
+    WaitForKey(u8),
 }
 
 impl TryFrom<u16> for Opcode {
@@ -63,6 +66,9 @@ impl TryFrom<u16> for Opcode {
             (0xb, _, _, _) => Ok(Self::JumpOffset(nnn)),
             (0xc, x, _, _) => Ok(Self::Rand(x, kk)),
             (0xd, x, y, n) => Ok(Self::Display(x, y, n)),
+            (0xe, x, 0x9, 0xe) => Ok(Self::SkipIfKey(x)),
+            (0xe, x, 0xa, 0x1) => Ok(Self::SkipIfNotKey(x)),
+            (0xf, x, 0x0, 0xa) => Ok(Self::WaitForKey(x)),
             _ => Err(VmError::InvalidOpcode(value)),
         }
     }
@@ -95,5 +101,8 @@ mod tests {
         assert_eq!(Opcode::try_from(0xbabc), Ok(Opcode::JumpOffset(0x0abc)));
         assert_eq!(Opcode::try_from(0xcabc), Ok(Opcode::Rand(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0xdabc), Ok(Opcode::Display(0xa, 0xb, 0xc)));
+        assert_eq!(Opcode::try_from(0xea9e), Ok(Opcode::SkipIfKey(0xa)));
+        assert_eq!(Opcode::try_from(0xeaa1), Ok(Opcode::SkipIfNotKey(0xa)));
+        assert_eq!(Opcode::try_from(0xfa0a), Ok(Opcode::WaitForKey(0xa)));
     }
 }

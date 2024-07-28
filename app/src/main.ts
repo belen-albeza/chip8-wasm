@@ -1,6 +1,9 @@
 import wasmInit, { loadRom, Emu } from "chip8";
 
-const ROMS = [{ name: "poker.ch8", url: "/roms/poker.ch8" }];
+const ROMS = [
+  { name: "poker.ch8", url: "/roms/poker.ch8" },
+  { name: "wait_for_key.ch8", url: "/roms/wait_for_key.ch8" },
+];
 const DISPLAY_LEN = 64 * 32;
 const THEMES = [
   {
@@ -31,6 +34,8 @@ const THEMES = [
 ];
 
 let animationFrameRequestId: number;
+let keyDownController = new AbortController();
+let keyUpController = new AbortController();
 
 const config = {
   cyclesPerFrame: 12,
@@ -47,6 +52,11 @@ async function main() {
 async function startEmulatorWithRom(romUrl: string) {
   if (animationFrameRequestId) {
     cancelAnimationFrame(animationFrameRequestId);
+    keyDownController.abort();
+    keyUpController.abort();
+
+    keyDownController = new AbortController();
+    keyUpController = new AbortController();
   }
 
   const wasm = await wasmInit();
@@ -54,8 +64,24 @@ async function startEmulatorWithRom(romUrl: string) {
 
   setupConfigPanel(emu);
   emu.setTheme(config.theme.off, config.theme.on);
-  const sharedBuffer = new Uint8Array(wasm.memory.buffer);
 
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      emu.updateKeyState(event.code, true);
+    },
+    { signal: keyDownController.signal }
+  );
+
+  document.addEventListener(
+    "keyup",
+    (event) => {
+      emu.updateKeyState(event.code, false);
+    },
+    { signal: keyUpController.signal }
+  );
+
+  const sharedBuffer = new Uint8Array(wasm.memory.buffer);
   const canvas = document.querySelector<HTMLCanvasElement>("#chip8-canvas");
   const ctx = canvas?.getContext("2d");
   if (!ctx || !canvas) {
