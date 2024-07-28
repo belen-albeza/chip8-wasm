@@ -11,6 +11,7 @@ pub enum Opcode {
     AddVx(u8, u8),
     LoadI(u16),
     Display(u8, u8, u8),
+    SkipIfEqual(u8, u8),
 }
 
 impl TryFrom<u16> for Opcode {
@@ -31,6 +32,7 @@ impl TryFrom<u16> for Opcode {
             (0x0, 0x0, 0xe, 0x0) => Ok(Self::ClearScreen),
             (0x0, _, _, _) => Ok(Self::NoOp),
             (0x1, _, _, _) => Ok(Self::Jump(nnn)),
+            (0x3, x, _, _) => Ok(Self::SkipIfEqual(x, kk)),
             (0x6, x, _, _) => Ok(Self::LoadVx(x, kk)),
             (0x7, x, _, _) => Ok(Self::AddVx(x, kk)),
             (0xa, _, _, _) => Ok(Self::LoadI(nnn)),
@@ -49,6 +51,7 @@ mod tests {
         assert_eq!(Opcode::try_from(0x00e0), Ok(Opcode::ClearScreen));
         assert_eq!(Opcode::try_from(0x0abc), Ok(Opcode::NoOp));
         assert_eq!(Opcode::try_from(0x1abc), Ok(Opcode::Jump(0x0abc)));
+        assert_eq!(Opcode::try_from(0x3abc), Ok(Opcode::SkipIfEqual(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0x6abc), Ok(Opcode::LoadVx(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0x7abc), Ok(Opcode::AddVx(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0xaabc), Ok(Opcode::LoadI(0x0abc)));

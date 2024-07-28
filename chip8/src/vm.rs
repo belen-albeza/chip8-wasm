@@ -60,21 +60,23 @@ impl Vm {
         }
     }
 
-    pub fn tick(&mut self) -> Result<bool> {
+    pub fn tick(&mut self) -> Result<()> {
         let raw_opcode = self.next_opcode()?;
         let opcode = Opcode::try_from(raw_opcode)?;
 
-        let shall_halt = match opcode {
+        match opcode {
             Opcode::ClearScreen => self.exec_clear_screen()?,
             Opcode::Jump(addr) => self.exec_jump_absolute(addr)?,
             Opcode::LoadVx(x, value) => self.exec_load_vx(x, value)?,
+            Opcode::SkipIfEqual(x, value) => self.exec_skip_if_equal(x, value)?,
             Opcode::AddVx(x, value) => self.exec_add_vx(x, value)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
-            Opcode::NoOp => false,
+            Opcode::NoOp => {}
+            _ => todo!(),
         };
 
-        Ok(shall_halt)
+        Ok(())
     }
 
     fn next_opcode(&mut self) -> Result<u16> {
@@ -95,32 +97,32 @@ impl Vm {
         res
     }
 
-    fn exec_clear_screen(&mut self) -> Result<bool> {
+    fn exec_clear_screen(&mut self) -> Result<()> {
         self.display = [false; DISPLAY_LEN];
-        Ok(false)
+        Ok(())
     }
 
-    fn exec_jump_absolute(&mut self, addr: u16) -> Result<bool> {
+    fn exec_jump_absolute(&mut self, addr: u16) -> Result<()> {
         self.pc = addr;
-        Ok(false)
+        Ok(())
     }
 
-    fn exec_load_vx(&mut self, x: u8, value: u8) -> Result<bool> {
+    fn exec_load_vx(&mut self, x: u8, value: u8) -> Result<()> {
         self.v_registers[x as usize] = value;
-        Ok(false)
+        Ok(())
     }
 
-    fn exec_add_vx(&mut self, x: u8, value: u8) -> Result<bool> {
+    fn exec_add_vx(&mut self, x: u8, value: u8) -> Result<()> {
         self.v_registers[x as usize] = self.v_registers[x as usize].wrapping_add(value);
-        Ok(false)
+        Ok(())
     }
 
-    fn exec_load_i(&mut self, addr: u16) -> Result<bool> {
+    fn exec_load_i(&mut self, addr: u16) -> Result<()> {
         self.i_register = addr;
-        Ok(false)
+        Ok(())
     }
 
-    fn exec_display(&mut self, vx: u8, vy: u8, rows: u8) -> Result<bool> {
+    fn exec_display(&mut self, vx: u8, vy: u8, rows: u8) -> Result<()> {
         self.v_registers[0xf] = 0x00;
 
         let sprite_x = self.v_registers[vx as usize];
@@ -143,20 +145,27 @@ impl Vm {
             }
         }
 
-        Ok(false)
+        Ok(())
     }
 
     #[inline]
     fn put_pixel(&mut self, x: u8, y: u8) -> bool {
         let x = x as usize % DISPLAY_WIDTH;
         let y = y as usize % DISPLAY_HEIGHT;
-        println!("Putting pixel at {}, {}", x, y);
         let i = y * DISPLAY_WIDTH + x;
 
         let erased = self.display[i];
         self.display[i] = !self.display[i];
 
         return erased;
+    }
+
+    fn exec_skip_if_equal(&mut self, vx: u8, value: u8) -> Result<()> {
+        if self.v_registers[vx as usize] == value {
+            self.pc += 2;
+        }
+
+        Ok(())
     }
 }
 
@@ -277,5 +286,24 @@ mod tests {
             vm.display[60 + 31 * DISPLAY_WIDTH..(64 + 31 * DISPLAY_WIDTH)],
             [true; 4]
         );
+    }
+
+    #[test]
+    fn opcode_skip_if_equal() {
+        let rom = [0x30, 0xab];
+        let mut vm = Vm::new(&rom);
+        vm.v_registers[0x0] = 0xab;
+
+        let mut res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x204);
+
+        vm.pc = 0x200;
+        vm.v_registers[0x0] = 0x0;
+        res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
     }
 }

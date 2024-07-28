@@ -51,7 +51,7 @@ impl Emu {
         for _ in 0..cycles {
             let res = self.vm.tick();
             shall_halt = match res {
-                Ok(x) => x,
+                Ok(_) => false,
                 Err(VmError::InvalidOpcode(_)) => true,
                 Err(err) => return Err(Error::from(err)),
             };
