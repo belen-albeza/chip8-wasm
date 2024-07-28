@@ -19,6 +19,7 @@ pub enum Opcode {
     Add(u8, u8),
     Sub(u8, u8),
     ShiftR(u8, u8),
+    SubN(u8, u8),
     LoadI(u16),
     Display(u8, u8, u8),
 }
@@ -53,6 +54,7 @@ impl TryFrom<u16> for Opcode {
             (0x8, x, y, 4) => Ok(Self::Add(x, y)),
             (0x8, x, y, 5) => Ok(Self::Sub(x, y)),
             (0x8, x, y, 6) => Ok(Self::ShiftR(x, y)),
+            (0x8, x, y, 7) => Ok(Self::SubN(x, y)),
             (0xa, _, _, _) => Ok(Self::LoadI(nnn)),
             (0xd, x, y, n) => Ok(Self::Display(x, y, n)),
             _ => Err(VmError::InvalidOpcode(value)),
@@ -81,6 +83,7 @@ mod tests {
         assert_eq!(Opcode::try_from(0x8ab4), Ok(Opcode::Add(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0x8ab5), Ok(Opcode::Sub(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0x8ab6), Ok(Opcode::ShiftR(0xa, 0xb)));
+        assert_eq!(Opcode::try_from(0x8ab7), Ok(Opcode::SubN(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0xaabc), Ok(Opcode::LoadI(0x0abc)));
         assert_eq!(Opcode::try_from(0xdabc), Ok(Opcode::Display(0xa, 0xb, 0xc)));
     }
