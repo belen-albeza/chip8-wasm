@@ -108,6 +108,7 @@ where
             Opcode::Rand(x, value) => self.exec_rand(x, value)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             Opcode::SkipIfKey(x) => self.exec_skip_if_key(x)?,
+            Opcode::SkipIfNotKey(x) => self.exec_skip_if_not_key(x)?,
             Opcode::NoOp => {}
             _ => todo!(),
         };
@@ -296,16 +297,28 @@ where
     }
 
     fn exec_skip_if_key(&mut self, vx: u8) -> Result<()> {
-        let key = self.v_registers[vx as usize];
-        match self.keys.get(key as usize) {
-            Some(state) => {
-                if *state {
-                    self.pc += 2;
-                }
-                Ok(())
-            }
-            None => Err(VmError::InvalidKey(key)),
+        let state = self.get_vx_key(vx)?;
+        if state {
+            self.pc += 2;
         }
+        Ok(())
+    }
+
+    fn exec_skip_if_not_key(&mut self, vx: u8) -> Result<()> {
+        let state = self.get_vx_key(vx)?;
+        if !state {
+            self.pc += 2;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn get_vx_key(&self, vx: u8) -> Result<bool> {
+        let key = self.v_registers[vx as usize];
+        self.keys
+            .get(key as usize)
+            .copied()
+            .ok_or(VmError::InvalidKey(key))
     }
 }
 
@@ -697,6 +710,26 @@ mod tests {
 
         vm.pc = 0x200;
         vm.keys[0xa] = false;
+        res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+    }
+
+    #[test]
+    fn opcode_skip_if_not_key() {
+        let rom = [0xe0, 0xa1];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0xa;
+        vm.keys[0xa] = false;
+
+        let mut res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x204);
+
+        vm.pc = 0x200;
+        vm.keys[0xa] = true;
         res = vm.tick();
 
         assert!(res.is_ok());

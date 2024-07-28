@@ -26,6 +26,7 @@ pub enum Opcode {
     Rand(u8, u8),
     Display(u8, u8, u8),
     SkipIfKey(u8),
+    SkipIfNotKey(u8),
 }
 
 impl TryFrom<u16> for Opcode {
@@ -65,6 +66,7 @@ impl TryFrom<u16> for Opcode {
             (0xc, x, _, _) => Ok(Self::Rand(x, kk)),
             (0xd, x, y, n) => Ok(Self::Display(x, y, n)),
             (0xe, x, 0x9, 0xe) => Ok(Self::SkipIfKey(x)),
+            (0xe, x, 0xa, 0x1) => Ok(Self::SkipIfNotKey(x)),
             _ => Err(VmError::InvalidOpcode(value)),
         }
     }
@@ -98,5 +100,6 @@ mod tests {
         assert_eq!(Opcode::try_from(0xcabc), Ok(Opcode::Rand(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0xdabc), Ok(Opcode::Display(0xa, 0xb, 0xc)));
         assert_eq!(Opcode::try_from(0xea9e), Ok(Opcode::SkipIfKey(0xa)));
+        assert_eq!(Opcode::try_from(0xeaa1), Ok(Opcode::SkipIfNotKey(0xa)));
     }
 }
