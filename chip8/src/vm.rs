@@ -92,6 +92,11 @@ where
         }
     }
 
+    pub fn tick_timers(&mut self) {
+        self.delay = self.delay.saturating_sub(1);
+        self.sound = self.sound.saturating_sub(1);
+    }
+
     pub fn tick(&mut self) -> Result<()> {
         if self.is_waiting {
             return Ok(());
@@ -124,6 +129,8 @@ where
             Opcode::SkipIfKey(x) => self.exec_skip_if_key(x)?,
             Opcode::SkipIfNotKey(x) => self.exec_skip_if_not_key(x)?,
             Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
+            Opcode::LoadDelay(x) => self.exec_load_delay(x)?,
+            Opcode::StoreDelay(x) => self.exec_store_delay(x)?,
             Opcode::NoOp => {}
             _ => todo!(),
         };
@@ -342,6 +349,16 @@ where
 
         Ok(())
     }
+
+    fn exec_load_delay(&mut self, vx: u8) -> Result<()> {
+        self.v_registers[vx as usize] = self.delay;
+        Ok(())
+    }
+
+    fn exec_store_delay(&mut self, vx: u8) -> Result<()> {
+        self.delay = self.v_registers[vx as usize];
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -384,6 +401,21 @@ mod tests {
         let _ = vm.set_key(0xa, true);
         assert_eq!(vm.is_waiting, false);
         assert_eq!(vm.v_registers[0xb], 0xa);
+    }
+
+    #[test]
+    fn ticks_timers() {
+        let mut vm = any_vm(&[]);
+        vm.delay = 0x01;
+        vm.sound = 0x02;
+
+        vm.tick_timers();
+        assert_eq!(vm.delay, 0x00);
+        assert_eq!(vm.sound, 0x01);
+
+        vm.tick_timers();
+        assert_eq!(vm.delay, 0x00);
+        assert_eq!(vm.sound, 0x00);
     }
 
     #[test]
@@ -796,5 +828,32 @@ mod tests {
         let _ = vm.set_key(0xa, true);
         assert_eq!(vm.is_waiting, false);
         assert_eq!(vm.v_registers[0x0], 0xa);
+    }
+
+    #[test]
+    fn opcode_load_delay() {
+        let rom = [0xf0, 0x07];
+        let mut vm = any_vm(&rom);
+        vm.delay = 0xab;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.v_registers[0x0], 0xab);
+    }
+
+    #[test]
+    fn opcode_store_delay() {
+        let rom = [0xf0, 0x15];
+        let mut vm = any_vm(&rom);
+        vm.delay = 0x00;
+        vm.v_registers[0x0] = 0xab;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.delay, 0xab);
     }
 }

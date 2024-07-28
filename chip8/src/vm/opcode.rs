@@ -28,6 +28,8 @@ pub enum Opcode {
     SkipIfKey(u8),
     SkipIfNotKey(u8),
     WaitForKey(u8),
+    LoadDelay(u8),
+    StoreDelay(u8),
 }
 
 impl TryFrom<u16> for Opcode {
@@ -69,6 +71,8 @@ impl TryFrom<u16> for Opcode {
             (0xe, x, 0x9, 0xe) => Ok(Self::SkipIfKey(x)),
             (0xe, x, 0xa, 0x1) => Ok(Self::SkipIfNotKey(x)),
             (0xf, x, 0x0, 0xa) => Ok(Self::WaitForKey(x)),
+            (0xf, x, 0x0, 0x7) => Ok(Self::LoadDelay(x)),
+            (0xf, x, 0x1, 0x5) => Ok(Self::StoreDelay(x)),
             _ => Err(VmError::InvalidOpcode(value)),
         }
     }
@@ -104,5 +108,7 @@ mod tests {
         assert_eq!(Opcode::try_from(0xea9e), Ok(Opcode::SkipIfKey(0xa)));
         assert_eq!(Opcode::try_from(0xeaa1), Ok(Opcode::SkipIfNotKey(0xa)));
         assert_eq!(Opcode::try_from(0xfa0a), Ok(Opcode::WaitForKey(0xa)));
+        assert_eq!(Opcode::try_from(0xfa07), Ok(Opcode::LoadDelay(0xa)));
+        assert_eq!(Opcode::try_from(0xfa15), Ok(Opcode::StoreDelay(0xa)));
     }
 }
