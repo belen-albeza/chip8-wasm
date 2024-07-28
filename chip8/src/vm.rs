@@ -97,6 +97,10 @@ where
         self.sound = self.sound.saturating_sub(1);
     }
 
+    pub fn sound(&self) -> u8 {
+        self.sound
+    }
+
     pub fn tick(&mut self) -> Result<()> {
         if self.is_waiting {
             return Ok(());
@@ -131,6 +135,7 @@ where
             Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
             Opcode::LoadDelay(x) => self.exec_load_delay(x)?,
             Opcode::StoreDelay(x) => self.exec_store_delay(x)?,
+            Opcode::StoreSound(x) => self.exec_store_sound(x)?,
             Opcode::NoOp => {}
             _ => todo!(),
         };
@@ -357,6 +362,11 @@ where
 
     fn exec_store_delay(&mut self, vx: u8) -> Result<()> {
         self.delay = self.v_registers[vx as usize];
+        Ok(())
+    }
+
+    fn exec_store_sound(&mut self, vx: u8) -> Result<()> {
+        self.sound = self.v_registers[vx as usize];
         Ok(())
     }
 }
@@ -855,5 +865,19 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.delay, 0xab);
+    }
+
+    #[test]
+    fn opcode_store_sound() {
+        let rom = [0xf0, 0x18];
+        let mut vm = any_vm(&rom);
+        vm.sound = 0x00;
+        vm.v_registers[0x0] = 0xab;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.sound, 0xab);
     }
 }

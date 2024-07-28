@@ -1,8 +1,10 @@
 import wasmInit, { loadRom, Emu } from "chip8";
+import Buzzer from "./audio";
 
 const ROMS = [
   { name: "poker.ch8", url: "/roms/poker.ch8" },
   { name: "wait_for_key.ch8", url: "/roms/wait_for_key.ch8" },
+  { name: "buzz.ch8", url: "/roms/buzz.ch8" },
 ];
 const DISPLAY_LEN = 64 * 32;
 const THEMES = [
@@ -34,8 +36,9 @@ const THEMES = [
 ];
 
 let animationFrameRequestId: number;
-let keyDownController = new AbortController();
-let keyUpController = new AbortController();
+let keyDownController: AbortController | undefined;
+let keyUpController: AbortController | undefined;
+let buzzer: Buzzer | undefined = undefined;
 
 const config = {
   cyclesPerFrame: 12,
@@ -46,23 +49,39 @@ main();
 
 async function main() {
   setupRomSelector(ROMS);
-  startEmulatorWithRom(ROMS[0].url);
+  setupConfigPanel();
+}
+
+function wireConfigPanelToEmulator(emu: Emu) {
+  const themeSelect = document.querySelector<HTMLSelectElement>(
+    "#chip8-config-theme-selector"
+  );
+
+  const handleThemeChanged = (event: Event) => {
+    const idx = parseInt((event.target as HTMLInputElement).value);
+    config.theme = THEMES[idx];
+    emu.setTheme(config.theme.off, config.theme.on);
+  };
+
+  themeSelect?.addEventListener("change", handleThemeChanged);
+
+  return () => {
+    themeSelect?.removeEventListener("change", handleThemeChanged);
+  };
 }
 
 async function startEmulatorWithRom(romUrl: string) {
-  if (animationFrameRequestId) {
-    cancelAnimationFrame(animationFrameRequestId);
-    keyDownController.abort();
-    keyUpController.abort();
+  keyDownController = new AbortController();
+  keyUpController = new AbortController();
 
-    keyDownController = new AbortController();
-    keyUpController = new AbortController();
+  if (!buzzer) {
+    buzzer = new Buzzer();
   }
 
   const wasm = await wasmInit();
   const emu = await loadRomInEmu(romUrl);
 
-  setupConfigPanel(emu);
+  const configCleanUp = wireConfigPanelToEmulator(emu);
   emu.setTheme(config.theme.off, config.theme.on);
 
   document.addEventListener(
@@ -81,6 +100,18 @@ async function startEmulatorWithRom(romUrl: string) {
     { signal: keyUpController.signal }
   );
 
+  const cleanUp = () => {
+    configCleanUp();
+
+    buzzer?.stop();
+    keyDownController?.abort();
+    keyUpController?.abort();
+
+    if (animationFrameRequestId) {
+      cancelAnimationFrame(animationFrameRequestId);
+    }
+  };
+
   const sharedBuffer = new Uint8Array(wasm.memory.buffer);
   const canvas = document.querySelector<HTMLCanvasElement>("#chip8-canvas");
   const ctx = canvas?.getContext("2d");
@@ -89,8 +120,14 @@ async function startEmulatorWithRom(romUrl: string) {
   }
   const imageData = ctx.createImageData(canvas.width, canvas.height);
 
-  const updateCanvas = () => {
+  const updateFrame = () => {
     let shallHalt = emu.run(config.cyclesPerFrame);
+
+    if (emu.isBuzzing()) {
+      buzzer?.play();
+    } else {
+      buzzer?.stop();
+    }
 
     const outputPointer = emu.displayBuffer();
     const bufferData = sharedBuffer.slice(
@@ -102,12 +139,15 @@ async function startEmulatorWithRom(romUrl: string) {
 
     if (shallHalt) {
       console.debug("Chip-8 VM halted");
+      cleanUp();
     } else {
-      animationFrameRequestId = requestAnimationFrame(updateCanvas);
+      animationFrameRequestId = requestAnimationFrame(updateFrame);
     }
   };
 
-  updateCanvas();
+  updateFrame();
+
+  return cleanUp;
 }
 
 function setupRomSelector(roms: { name: string; url: string }[]) {
@@ -118,18 +158,22 @@ function setupRomSelector(roms: { name: string; url: string }[]) {
     const option = new Option();
     option.value = url;
     option.innerHTML = name;
-    option.defaultSelected = name === roms[0]?.name;
 
     selectEl?.appendChild(option);
   }
 
-  selectEl?.addEventListener("change", () => {
+  let cleanUp: () => void;
+
+  selectEl?.addEventListener("change", async () => {
+    if (cleanUp) {
+      await cleanUp();
+    }
     let url = selectEl.value;
-    startEmulatorWithRom(url);
+    cleanUp = await startEmulatorWithRom(url);
   });
 }
 
-function setupConfigPanel(emu: Emu) {
+function setupConfigPanel() {
   const cyclesInput = document.querySelector(
     "#chip8-ipf-selector"
   ) as HTMLInputElement;
@@ -160,11 +204,22 @@ function setupConfigPanel(emu: Emu) {
     option.innerText = name;
     themeSelect?.appendChild(option);
   }
-  themeSelect?.addEventListener("change", () => {
-    const idx = parseInt(themeSelect.value);
-    config.theme = THEMES[idx];
-    emu.setTheme(config.theme.off, config.theme.on);
-  });
+
+  const audioCheckbox = document.querySelector<HTMLInputElement>(
+    "#chip8-config-audio"
+  );
+
+  const updateAudioConfig = () => {
+    const isAudioEnabled = !!audioCheckbox?.checked;
+    if (isAudioEnabled) {
+      buzzer?.unmute();
+    } else {
+      buzzer?.mute();
+    }
+  };
+
+  updateAudioConfig();
+  audioCheckbox?.addEventListener("change", updateAudioConfig);
 }
 
 async function fetchRom(url: string) {

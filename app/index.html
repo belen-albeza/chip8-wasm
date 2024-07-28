@@ -17,11 +17,14 @@
         <footer>
           <p>
             <label>Select ROM
-              <select id="chip8-rom-selector"></select>
+              <select id="chip8-rom-selector">
+                <option disabled selected>No ROM loaded</option>
+              </select>
             </label>
           </p>
           <details open>
             <summary>Config</summary>
+            <p><label><input type="checkbox" checked id="chip8-config-audio">Audio</label></p>
             <p>
               <label>Instructions per frame
                 <input type="number" min="1" max="30" value="16" id="chip8-ipf-selector"/>

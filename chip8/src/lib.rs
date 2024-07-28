@@ -116,6 +116,11 @@ impl Emu {
         Ok(())
     }
 
+    #[wasm_bindgen(js_name=isBuzzing)]
+    pub fn is_buzzing(&self) -> bool {
+        self.vm.sound() > 0
+    }
+
     fn update_display_buffer(&self) {
         for (i, pixel) in self.vm.display.iter().enumerate() {
             let (r, g, b) = if *pixel {
