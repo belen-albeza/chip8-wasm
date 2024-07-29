@@ -136,6 +136,8 @@ where
             Opcode::LoadDelay(x) => self.exec_load_delay(x)?,
             Opcode::StoreDelay(x) => self.exec_store_delay(x)?,
             Opcode::StoreSound(x) => self.exec_store_sound(x)?,
+            Opcode::StoreRegisters(x) => self.exec_store_registers(x)?,
+            Opcode::LoadRegisters(x) => self.exec_load_registers(x)?,
             Opcode::NoOp => {}
             _ => todo!(),
         };
@@ -159,6 +161,25 @@ where
             .ok_or(VmError::InvalidAddress(self.pc));
         self.pc += 1;
         res
+    }
+
+    #[inline]
+    fn write_byte_at(&mut self, addr: u16, value: u8) -> Result<()> {
+        let slot = self
+            .ram
+            .get_mut(addr as usize)
+            .ok_or(VmError::InvalidAddress(addr))?;
+        *slot = value;
+
+        Ok(())
+    }
+
+    #[inline]
+    fn read_byte_at(&mut self, addr: u16) -> Result<u8> {
+        self.ram
+            .get(addr as usize)
+            .copied()
+            .ok_or(VmError::InvalidAddress(addr))
     }
 
     fn exec_clear_screen(&mut self) -> Result<()> {
@@ -367,6 +388,24 @@ where
 
     fn exec_store_sound(&mut self, vx: u8) -> Result<()> {
         self.sound = self.v_registers[vx as usize];
+        Ok(())
+    }
+
+    fn exec_store_registers(&mut self, vx: u8) -> Result<()> {
+        for i in 0..=vx as usize {
+            self.write_byte_at(self.i_register, self.v_registers[i])?;
+            self.i_register += 1;
+        }
+
+        Ok(())
+    }
+
+    fn exec_load_registers(&mut self, vx: u8) -> Result<()> {
+        for i in 0..=vx as usize {
+            self.v_registers[i] = self.read_byte_at(self.i_register)?;
+            self.i_register += 1;
+        }
+
         Ok(())
     }
 }
@@ -879,5 +918,35 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.sound, 0xab);
+    }
+
+    #[test]
+    fn opcode_store_registers() {
+        let rom = [0xf2, 0x55];
+        let mut vm = any_vm(&rom);
+        vm.i_register = 0x300;
+        vm.v_registers[0x0..0x03].copy_from_slice(&[0xa, 0xb, 0xc]);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.i_register, 0x303);
+        assert_eq!(vm.ram[0x300..0x303], [0xa, 0xb, 0xc]);
+    }
+
+    #[test]
+    fn opcode_load_registers() {
+        let rom = [0xf2, 0x65];
+        let mut vm = any_vm(&rom);
+        vm.i_register = 0x300;
+        vm.ram[0x300..0x303].copy_from_slice(&[0xa, 0xb, 0xc]);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.i_register, 0x303);
+        assert_eq!(vm.v_registers[0..3], [0xa, 0xb, 0xc]);
     }
 }

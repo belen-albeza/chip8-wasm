@@ -31,6 +31,8 @@ pub enum Opcode {
     LoadDelay(u8),
     StoreDelay(u8),
     StoreSound(u8),
+    StoreRegisters(u8),
+    LoadRegisters(u8),
 }
 
 impl TryFrom<u16> for Opcode {
@@ -75,6 +77,8 @@ impl TryFrom<u16> for Opcode {
             (0xf, x, 0x0, 0x7) => Ok(Self::LoadDelay(x)),
             (0xf, x, 0x1, 0x5) => Ok(Self::StoreDelay(x)),
             (0xf, x, 0x1, 0x8) => Ok(Self::StoreSound(x)),
+            (0xf, x, 0x5, 0x5) => Ok(Self::StoreRegisters(x)),
+            (0xf, x, 0x6, 0x5) => Ok(Self::LoadRegisters(x)),
             _ => Err(VmError::InvalidOpcode(value)),
         }
     }
@@ -113,5 +117,7 @@ mod tests {
         assert_eq!(Opcode::try_from(0xfa07), Ok(Opcode::LoadDelay(0xa)));
         assert_eq!(Opcode::try_from(0xfa15), Ok(Opcode::StoreDelay(0xa)));
         assert_eq!(Opcode::try_from(0xfa18), Ok(Opcode::StoreSound(0xa)));
+        assert_eq!(Opcode::try_from(0xfa55), Ok(Opcode::StoreRegisters(0xa)));
+        assert_eq!(Opcode::try_from(0xfa65), Ok(Opcode::LoadRegisters(0xa)));
     }
 }
