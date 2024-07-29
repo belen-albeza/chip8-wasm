@@ -118,7 +118,7 @@ where
             Opcode::Call(addr) => self.exec_call(addr)?,
             Opcode::LoadVx(x, value) => self.exec_load_vx(x, value)?,
             Opcode::SkipIfEq(x, value) => self.exec_skip_if_equal(x, value)?,
-            Opcode::SkipIfNotEq(x, value) => self.exec_skip_if_not_equal(x, value)?,
+            Opcode::SkipIfNeq(x, value) => self.exec_skip_if_not_equal(x, value)?,
             Opcode::SkipEqVxVy(x, y) => self.exec_skip_if_equal_vx_vy(x, y)?,
             Opcode::AddVx(x, value) => self.exec_add_vx(x, value)?,
             Opcode::LoadVxVy(x, y) => self.exec_load_vx_vy(x, y)?,
@@ -130,14 +130,15 @@ where
             Opcode::ShiftR(x, y) => self.exec_shift_right(x, y)?,
             Opcode::SubN(x, y) => self.exec_subn_vy_vx(x, y)?,
             Opcode::ShiftL(x, y) => self.exec_shift_left(x, y)?,
+            Opcode::SkipNeqVxVy(x, y) => self.exec_skip_if_not_equal_vx_vy(x, y)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::JumpOffset(addr) => self.exec_jump_offset(addr)?,
             Opcode::Rand(x, value) => self.exec_rand(x, value)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             Opcode::SkipIfKey(x) => self.exec_skip_if_key(x)?,
             Opcode::SkipIfNotKey(x) => self.exec_skip_if_not_key(x)?,
-            Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
             Opcode::LoadDelay(x) => self.exec_load_delay(x)?,
+            Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
             Opcode::StoreDelay(x) => self.exec_store_delay(x)?,
             Opcode::StoreSound(x) => self.exec_store_sound(x)?,
             Opcode::StoreRegisters(x) => self.exec_store_registers(x)?,
@@ -267,6 +268,14 @@ where
 
     fn exec_skip_if_equal_vx_vy(&mut self, vx: u8, vy: u8) -> Result<()> {
         if self.v_registers[vx as usize] == self.v_registers[vy as usize] {
+            self.pc += 2;
+        }
+
+        Ok(())
+    }
+
+    fn exec_skip_if_not_equal_vx_vy(&mut self, vx: u8, vy: u8) -> Result<()> {
+        if self.v_registers[vx as usize] != self.v_registers[vy as usize] {
             self.pc += 2;
         }
 
@@ -529,6 +538,26 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0xa], 0x11 + 0xbc);
+    }
+
+    #[test]
+    fn opcode_skip_if_not_equal_vx_vy() {
+        let rom = [0x90, 0x10];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0x00;
+        vm.v_registers[0x1] = 0x01;
+
+        let mut res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x204);
+
+        vm.pc = 0x200;
+        vm.v_registers[0x0] = 0x01;
+        res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
     }
 
     #[test]

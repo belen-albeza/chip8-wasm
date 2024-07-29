@@ -10,7 +10,7 @@ pub enum Opcode {
     Jump(u16),
     Call(u16),
     SkipIfEq(u8, u8),
-    SkipIfNotEq(u8, u8),
+    SkipIfNeq(u8, u8),
     SkipEqVxVy(u8, u8),
     LoadVx(u8, u8),
     AddVx(u8, u8),
@@ -23,14 +23,15 @@ pub enum Opcode {
     ShiftR(u8, u8),
     SubN(u8, u8),
     ShiftL(u8, u8),
+    SkipNeqVxVy(u8, u8),
     LoadI(u16),
     JumpOffset(u16),
     Rand(u8, u8),
     Display(u8, u8, u8),
     SkipIfKey(u8),
     SkipIfNotKey(u8),
-    WaitForKey(u8),
     LoadDelay(u8),
+    WaitForKey(u8),
     StoreDelay(u8),
     StoreSound(u8),
     StoreRegisters(u8),
@@ -58,7 +59,7 @@ impl TryFrom<u16> for Opcode {
             (0x1, _, _, _) => Ok(Self::Jump(nnn)),
             (0x2, _, _, _) => Ok(Self::Call(nnn)),
             (0x3, x, _, _) => Ok(Self::SkipIfEq(x, kk)),
-            (0x4, x, _, _) => Ok(Self::SkipIfNotEq(x, kk)),
+            (0x4, x, _, _) => Ok(Self::SkipIfNeq(x, kk)),
             (0x5, x, y, 0) => Ok(Self::SkipEqVxVy(x, y)),
             (0x6, x, _, _) => Ok(Self::LoadVx(x, kk)),
             (0x7, x, _, _) => Ok(Self::AddVx(x, kk)),
@@ -71,14 +72,15 @@ impl TryFrom<u16> for Opcode {
             (0x8, x, y, 0x6) => Ok(Self::ShiftR(x, y)),
             (0x8, x, y, 0x7) => Ok(Self::SubN(x, y)),
             (0x8, x, y, 0xe) => Ok(Self::ShiftL(x, y)),
+            (0x9, x, y, 0) => Ok(Self::SkipNeqVxVy(x, y)),
             (0xa, _, _, _) => Ok(Self::LoadI(nnn)),
             (0xb, _, _, _) => Ok(Self::JumpOffset(nnn)),
             (0xc, x, _, _) => Ok(Self::Rand(x, kk)),
             (0xd, x, y, n) => Ok(Self::Display(x, y, n)),
             (0xe, x, 0x9, 0xe) => Ok(Self::SkipIfKey(x)),
             (0xe, x, 0xa, 0x1) => Ok(Self::SkipIfNotKey(x)),
-            (0xf, x, 0x0, 0xa) => Ok(Self::WaitForKey(x)),
             (0xf, x, 0x0, 0x7) => Ok(Self::LoadDelay(x)),
+            (0xf, x, 0x0, 0xa) => Ok(Self::WaitForKey(x)),
             (0xf, x, 0x1, 0x5) => Ok(Self::StoreDelay(x)),
             (0xf, x, 0x1, 0x8) => Ok(Self::StoreSound(x)),
             (0xf, x, 0x5, 0x5) => Ok(Self::StoreRegisters(x)),
@@ -100,7 +102,7 @@ mod tests {
         assert_eq!(Opcode::try_from(0x1abc), Ok(Opcode::Jump(0x0abc)));
         assert_eq!(Opcode::try_from(0x2abc), Ok(Opcode::Call(0x0abc)));
         assert_eq!(Opcode::try_from(0x3abc), Ok(Opcode::SkipIfEq(0xa, 0xbc)));
-        assert_eq!(Opcode::try_from(0x4abc), Ok(Opcode::SkipIfNotEq(0xa, 0xbc)));
+        assert_eq!(Opcode::try_from(0x4abc), Ok(Opcode::SkipIfNeq(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0x5ab0), Ok(Opcode::SkipEqVxVy(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0x6abc), Ok(Opcode::LoadVx(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0x7abc), Ok(Opcode::AddVx(0xa, 0xbc)));
@@ -113,14 +115,15 @@ mod tests {
         assert_eq!(Opcode::try_from(0x8ab6), Ok(Opcode::ShiftR(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0x8ab7), Ok(Opcode::SubN(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0x8abe), Ok(Opcode::ShiftL(0xa, 0xb)));
+        assert_eq!(Opcode::try_from(0x9ab0), Ok(Opcode::SkipNeqVxVy(0xa, 0xb)));
         assert_eq!(Opcode::try_from(0xaabc), Ok(Opcode::LoadI(0x0abc)));
         assert_eq!(Opcode::try_from(0xbabc), Ok(Opcode::JumpOffset(0x0abc)));
         assert_eq!(Opcode::try_from(0xcabc), Ok(Opcode::Rand(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0xdabc), Ok(Opcode::Display(0xa, 0xb, 0xc)));
         assert_eq!(Opcode::try_from(0xea9e), Ok(Opcode::SkipIfKey(0xa)));
         assert_eq!(Opcode::try_from(0xeaa1), Ok(Opcode::SkipIfNotKey(0xa)));
-        assert_eq!(Opcode::try_from(0xfa0a), Ok(Opcode::WaitForKey(0xa)));
         assert_eq!(Opcode::try_from(0xfa07), Ok(Opcode::LoadDelay(0xa)));
+        assert_eq!(Opcode::try_from(0xfa0a), Ok(Opcode::WaitForKey(0xa)));
         assert_eq!(Opcode::try_from(0xfa15), Ok(Opcode::StoreDelay(0xa)));
         assert_eq!(Opcode::try_from(0xfa18), Ok(Opcode::StoreSound(0xa)));
         assert_eq!(Opcode::try_from(0xfa55), Ok(Opcode::StoreRegisters(0xa)));
