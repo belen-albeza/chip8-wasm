@@ -34,6 +34,7 @@ pub enum Opcode {
     WaitForKey(u8),
     StoreDelay(u8),
     StoreSound(u8),
+    LoadDigit(u8),
     Bcd(u8),
     StoreRegisters(u8),
     LoadRegisters(u8),
@@ -84,6 +85,7 @@ impl TryFrom<u16> for Opcode {
             (0xf, x, 0x0, 0xa) => Ok(Self::WaitForKey(x)),
             (0xf, x, 0x1, 0x5) => Ok(Self::StoreDelay(x)),
             (0xf, x, 0x1, 0x8) => Ok(Self::StoreSound(x)),
+            (0xf, x, 0x2, 0x9) => Ok(Self::LoadDigit(x)),
             (0xf, x, 0x3, 0x3) => Ok(Self::Bcd(x)),
             (0xf, x, 0x5, 0x5) => Ok(Self::StoreRegisters(x)),
             (0xf, x, 0x6, 0x5) => Ok(Self::LoadRegisters(x)),
@@ -128,6 +130,7 @@ mod tests {
         assert_eq!(Opcode::try_from(0xfa0a), Ok(Opcode::WaitForKey(0xa)));
         assert_eq!(Opcode::try_from(0xfa15), Ok(Opcode::StoreDelay(0xa)));
         assert_eq!(Opcode::try_from(0xfa18), Ok(Opcode::StoreSound(0xa)));
+        assert_eq!(Opcode::try_from(0xfa29), Ok(Opcode::LoadDigit(0xa)));
         assert_eq!(Opcode::try_from(0xfa33), Ok(Opcode::Bcd(0xa)));
         assert_eq!(Opcode::try_from(0xfa55), Ok(Opcode::StoreRegisters(0xa)));
         assert_eq!(Opcode::try_from(0xfa65), Ok(Opcode::LoadRegisters(0xa)));

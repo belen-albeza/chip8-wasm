@@ -65,7 +65,7 @@ where
         let mut memory = [0; 4096];
         memory[0x200..0x200 + rom.len()].copy_from_slice(rom);
 
-        Self {
+        let mut res = Self {
             ram: memory,
             pc: 0x200,
             i_register: 0,
@@ -78,7 +78,10 @@ where
             randomize,
             is_waiting: false,
             vx_after_wait: 0x0,
-        }
+        };
+
+        res.load_fonts();
+        res
     }
 
     pub fn set_key(&mut self, key: u8, value: bool) -> Result<()> {
@@ -141,6 +144,7 @@ where
             Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
             Opcode::StoreDelay(x) => self.exec_store_delay(x)?,
             Opcode::StoreSound(x) => self.exec_store_sound(x)?,
+            Opcode::LoadDigit(x) => self.exec_load_digit(x)?,
             Opcode::Bcd(x) => self.exec_bcd(x)?,
             Opcode::StoreRegisters(x) => self.exec_store_registers(x)?,
             Opcode::LoadRegisters(x) => self.exec_load_registers(x)?,
@@ -149,6 +153,29 @@ where
         };
 
         Ok(())
+    }
+
+    fn load_fonts(&mut self) {
+        let numbers = [
+            [0xf0, 0x90, 0x90, 0x90, 0xf0], // 0
+            [0x20, 0x60, 0x20, 0x20, 0x70], // 1
+            [0xf0, 0x10, 0xf0, 0x80, 0xf0], // 2
+            [0xf0, 0x10, 0xf0, 0x10, 0xf0], // 3
+            [0x90, 0x90, 0xf0, 0x10, 0x10], // 4
+            [0xf0, 0x80, 0xf0, 0x10, 0x10], // 5
+            [0xf0, 0x80, 0xf0, 0x90, 0xf0], // 6
+            [0xf0, 0x10, 0x20, 0x40, 0x40], // 7
+            [0xf0, 0x90, 0xf0, 0x90, 0xf0], // 8
+            [0xf0, 0x90, 0xf0, 0x10, 0xf0], // 9
+            [0xf0, 0x90, 0xf0, 0x90, 0x90], // A
+            [0xe0, 0x90, 0xe0, 0x90, 0xe0], // B
+            [0xf0, 0x80, 0x80, 0x80, 0xf0], // C
+            [0xe0, 0x90, 0x90, 0x90, 0xe0], // D
+            [0xf0, 0x80, 0xf0, 0x80, 0xf0], // E
+            [0xf0, 0x80, 0xf0, 0x80, 0x80], // F
+        ]
+        .as_flattened();
+        self.ram[0x00..numbers.len()].copy_from_slice(&numbers);
     }
 
     fn next_opcode(&mut self) -> Result<u16> {
@@ -444,6 +471,14 @@ where
         self.write_byte_at(self.i_register, hundreds)?;
         self.write_byte_at(self.i_register + 1, tens)?;
         self.write_byte_at(self.i_register + 2, value)?;
+
+        Ok(())
+    }
+
+    fn exec_load_digit(&mut self, vx: u8) -> Result<()> {
+        let nibble = self.v_registers[vx as usize] & 0x0f;
+        let addr = nibble as u16 * 5;
+        self.i_register = addr;
 
         Ok(())
     }
@@ -1046,5 +1081,18 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.ram[0x300..0x303], [1, 2, 8]);
+    }
+
+    #[test]
+    fn load_digit() {
+        let rom = [0xf0, 0x29];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0xab;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.i_register, 0xb * 5);
     }
 }
