@@ -144,6 +144,7 @@ where
             Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
             Opcode::StoreDelay(x) => self.exec_store_delay(x)?,
             Opcode::StoreSound(x) => self.exec_store_sound(x)?,
+            Opcode::AddI(x) => self.exec_add_i(x)?,
             Opcode::LoadDigit(x) => self.exec_load_digit(x)?,
             Opcode::Bcd(x) => self.exec_bcd(x)?,
             Opcode::StoreRegisters(x) => self.exec_store_registers(x)?,
@@ -458,6 +459,11 @@ where
 
     fn exec_return(&mut self) -> Result<()> {
         self.pc = self.stack.pop().ok_or(VmError::EmptyStack)?;
+        Ok(())
+    }
+
+    fn exec_add_i(&mut self, vx: u8) -> Result<()> {
+        self.i_register += self.v_registers[vx as usize] as u16;
         Ok(())
     }
 
@@ -1084,7 +1090,7 @@ mod tests {
     }
 
     #[test]
-    fn load_digit() {
+    fn opcode_load_digit() {
         let rom = [0xf0, 0x29];
         let mut vm = any_vm(&rom);
         vm.v_registers[0x0] = 0xab;
@@ -1094,5 +1100,19 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.i_register, 0xb * 5);
+    }
+
+    #[test]
+    fn opcode_add_i() {
+        let rom = [0xf0, 0x1e];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0xab;
+        vm.i_register = 0x300;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.i_register, 0x3ab);
     }
 }
