@@ -6,7 +6,9 @@ use super::VmError;
 pub enum Opcode {
     NoOp,
     ClearScreen,
+    Ret,
     Jump(u16),
+    Call(u16),
     SkipIfEq(u8, u8),
     SkipIfNotEq(u8, u8),
     SkipEqVxVy(u8, u8),
@@ -51,8 +53,10 @@ impl TryFrom<u16> for Opcode {
 
         match nibbles {
             (0x0, 0x0, 0xe, 0x0) => Ok(Self::ClearScreen),
+            (0x0, 0x0, 0xe, 0xe) => Ok(Self::Ret),
             (0x0, _, _, _) => Ok(Self::NoOp),
             (0x1, _, _, _) => Ok(Self::Jump(nnn)),
+            (0x2, _, _, _) => Ok(Self::Call(nnn)),
             (0x3, x, _, _) => Ok(Self::SkipIfEq(x, kk)),
             (0x4, x, _, _) => Ok(Self::SkipIfNotEq(x, kk)),
             (0x5, x, y, 0) => Ok(Self::SkipEqVxVy(x, y)),
@@ -91,8 +95,10 @@ mod tests {
     #[test]
     fn try_from_short() {
         assert_eq!(Opcode::try_from(0x00e0), Ok(Opcode::ClearScreen));
+        assert_eq!(Opcode::try_from(0x00ee), Ok(Opcode::Ret));
         assert_eq!(Opcode::try_from(0x0abc), Ok(Opcode::NoOp));
         assert_eq!(Opcode::try_from(0x1abc), Ok(Opcode::Jump(0x0abc)));
+        assert_eq!(Opcode::try_from(0x2abc), Ok(Opcode::Call(0x0abc)));
         assert_eq!(Opcode::try_from(0x3abc), Ok(Opcode::SkipIfEq(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0x4abc), Ok(Opcode::SkipIfNotEq(0xa, 0xbc)));
         assert_eq!(Opcode::try_from(0x5ab0), Ok(Opcode::SkipEqVxVy(0xa, 0xb)));

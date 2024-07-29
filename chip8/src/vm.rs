@@ -23,6 +23,7 @@ where
     delay: u8,
     sound: u8,
     v_registers: [u8; 16],
+    stack: Vec<u16>,
     randomize: R,
 
     is_waiting: bool,
@@ -71,6 +72,7 @@ where
             delay: 0,
             sound: 0,
             v_registers: [0; 16],
+            stack: Vec::with_capacity(16),
             display: [false; DISPLAY_LEN],
             keys: [false; 16],
             randomize,
@@ -111,7 +113,9 @@ where
 
         match opcode {
             Opcode::ClearScreen => self.exec_clear_screen()?,
+            Opcode::Ret => self.exec_return()?,
             Opcode::Jump(addr) => self.exec_jump_absolute(addr)?,
+            Opcode::Call(addr) => self.exec_call(addr)?,
             Opcode::LoadVx(x, value) => self.exec_load_vx(x, value)?,
             Opcode::SkipIfEq(x, value) => self.exec_skip_if_equal(x, value)?,
             Opcode::SkipIfNotEq(x, value) => self.exec_skip_if_not_equal(x, value)?,
@@ -406,6 +410,17 @@ where
             self.i_register += 1;
         }
 
+        Ok(())
+    }
+
+    fn exec_call(&mut self, addr: u16) -> Result<()> {
+        self.stack.push(self.pc);
+        self.pc = addr;
+        Ok(())
+    }
+
+    fn exec_return(&mut self) -> Result<()> {
+        self.pc = self.stack.pop().ok_or(VmError::EmptyStack)?;
         Ok(())
     }
 }
@@ -948,5 +963,30 @@ mod tests {
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.i_register, 0x303);
         assert_eq!(vm.v_registers[0..3], [0xa, 0xb, 0xc]);
+    }
+
+    #[test]
+    fn opcode_call() {
+        let rom = [0x23, 0x00];
+        let mut vm = any_vm(&rom);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.stack.len(), 1);
+        assert_eq!(vm.pc, 0x300);
+    }
+
+    #[test]
+    fn opcode_ret() {
+        let rom = [0x00, 0xee];
+        let mut vm = any_vm(&rom);
+        vm.stack.push(0x300);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert!(vm.stack.is_empty());
+        assert_eq!(vm.pc, 0x300);
     }
 }
