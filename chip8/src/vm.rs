@@ -141,6 +141,7 @@ where
             Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
             Opcode::StoreDelay(x) => self.exec_store_delay(x)?,
             Opcode::StoreSound(x) => self.exec_store_sound(x)?,
+            Opcode::Bcd(x) => self.exec_bcd(x)?,
             Opcode::StoreRegisters(x) => self.exec_store_registers(x)?,
             Opcode::LoadRegisters(x) => self.exec_load_registers(x)?,
             Opcode::NoOp => {}
@@ -430,6 +431,20 @@ where
 
     fn exec_return(&mut self) -> Result<()> {
         self.pc = self.stack.pop().ok_or(VmError::EmptyStack)?;
+        Ok(())
+    }
+
+    fn exec_bcd(&mut self, vx: u8) -> Result<()> {
+        let mut value = self.v_registers[vx as usize];
+        let hundreds = value / 100;
+        value -= hundreds * 100;
+        let tens = value / 10;
+        value -= tens * 10;
+
+        self.write_byte_at(self.i_register, hundreds)?;
+        self.write_byte_at(self.i_register + 1, tens)?;
+        self.write_byte_at(self.i_register + 2, value)?;
+
         Ok(())
     }
 }
@@ -1017,5 +1032,19 @@ mod tests {
         assert!(res.is_ok());
         assert!(vm.stack.is_empty());
         assert_eq!(vm.pc, 0x300);
+    }
+
+    #[test]
+    fn opcode_bcd() {
+        let rom = [0xf0, 0x33];
+        let mut vm = any_vm(&rom);
+        vm.i_register = 0x300;
+        vm.v_registers[0x0] = 128;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.ram[0x300..0x303], [1, 2, 8]);
     }
 }
