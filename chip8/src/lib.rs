@@ -46,8 +46,9 @@ impl Emu {
 
     #[wasm_bindgen]
     pub fn run(&mut self, cycles: usize) -> Result<bool> {
-        let mut shall_halt = false;
+        self.vm.tick_timers();
 
+        let mut shall_halt = false;
         for _ in 0..cycles {
             let res = self.vm.tick();
             shall_halt = match res {
@@ -56,12 +57,12 @@ impl Emu {
                 Err(err) => return Err(Error::from(err)),
             };
 
-            self.update_display_buffer();
-
             if shall_halt {
                 break;
             }
         }
+
+        self.update_display_buffer();
 
         Ok(shall_halt)
     }
@@ -113,6 +114,11 @@ impl Emu {
         }
 
         Ok(())
+    }
+
+    #[wasm_bindgen(js_name=isBuzzing)]
+    pub fn is_buzzing(&self) -> bool {
+        self.vm.sound() > 0
     }
 
     fn update_display_buffer(&self) {
