@@ -23,6 +23,7 @@ where
     delay: u8,
     sound: u8,
     v_registers: [u8; 16],
+    stack: Vec<u16>,
     randomize: R,
 
     is_waiting: bool,
@@ -64,19 +65,23 @@ where
         let mut memory = [0; 4096];
         memory[0x200..0x200 + rom.len()].copy_from_slice(rom);
 
-        Self {
+        let mut res = Self {
             ram: memory,
             pc: 0x200,
             i_register: 0,
             delay: 0,
             sound: 0,
             v_registers: [0; 16],
+            stack: Vec::with_capacity(16),
             display: [false; DISPLAY_LEN],
             keys: [false; 16],
             randomize,
             is_waiting: false,
             vx_after_wait: 0x0,
-        }
+        };
+
+        res.load_fonts();
+        res
     }
 
     pub fn set_key(&mut self, key: u8, value: bool) -> Result<()> {
@@ -111,10 +116,12 @@ where
 
         match opcode {
             Opcode::ClearScreen => self.exec_clear_screen()?,
+            Opcode::Ret => self.exec_return()?,
             Opcode::Jump(addr) => self.exec_jump_absolute(addr)?,
+            Opcode::Call(addr) => self.exec_call(addr)?,
             Opcode::LoadVx(x, value) => self.exec_load_vx(x, value)?,
             Opcode::SkipIfEq(x, value) => self.exec_skip_if_equal(x, value)?,
-            Opcode::SkipIfNotEq(x, value) => self.exec_skip_if_not_equal(x, value)?,
+            Opcode::SkipIfNeq(x, value) => self.exec_skip_if_not_equal(x, value)?,
             Opcode::SkipEqVxVy(x, y) => self.exec_skip_if_equal_vx_vy(x, y)?,
             Opcode::AddVx(x, value) => self.exec_add_vx(x, value)?,
             Opcode::LoadVxVy(x, y) => self.exec_load_vx_vy(x, y)?,
@@ -126,21 +133,50 @@ where
             Opcode::ShiftR(x, y) => self.exec_shift_right(x, y)?,
             Opcode::SubN(x, y) => self.exec_subn_vy_vx(x, y)?,
             Opcode::ShiftL(x, y) => self.exec_shift_left(x, y)?,
+            Opcode::SkipNeqVxVy(x, y) => self.exec_skip_if_not_equal_vx_vy(x, y)?,
             Opcode::LoadI(addr) => self.exec_load_i(addr)?,
             Opcode::JumpOffset(addr) => self.exec_jump_offset(addr)?,
             Opcode::Rand(x, value) => self.exec_rand(x, value)?,
             Opcode::Display(x, y, rows) => self.exec_display(x, y, rows)?,
             Opcode::SkipIfKey(x) => self.exec_skip_if_key(x)?,
             Opcode::SkipIfNotKey(x) => self.exec_skip_if_not_key(x)?,
-            Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
             Opcode::LoadDelay(x) => self.exec_load_delay(x)?,
+            Opcode::WaitForKey(x) => self.exec_wait_for_key(x)?,
             Opcode::StoreDelay(x) => self.exec_store_delay(x)?,
             Opcode::StoreSound(x) => self.exec_store_sound(x)?,
+            Opcode::AddI(x) => self.exec_add_i(x)?,
+            Opcode::LoadDigit(x) => self.exec_load_digit(x)?,
+            Opcode::Bcd(x) => self.exec_bcd(x)?,
+            Opcode::StoreRegisters(x) => self.exec_store_registers(x)?,
+            Opcode::LoadRegisters(x) => self.exec_load_registers(x)?,
             Opcode::NoOp => {}
             _ => todo!(),
         };
 
         Ok(())
+    }
+
+    fn load_fonts(&mut self) {
+        let numbers = [
+            [0xf0, 0x90, 0x90, 0x90, 0xf0], // 0
+            [0x20, 0x60, 0x20, 0x20, 0x70], // 1
+            [0xf0, 0x10, 0xf0, 0x80, 0xf0], // 2
+            [0xf0, 0x10, 0xf0, 0x10, 0xf0], // 3
+            [0x90, 0x90, 0xf0, 0x10, 0x10], // 4
+            [0xf0, 0x80, 0xf0, 0x10, 0x10], // 5
+            [0xf0, 0x80, 0xf0, 0x90, 0xf0], // 6
+            [0xf0, 0x10, 0x20, 0x40, 0x40], // 7
+            [0xf0, 0x90, 0xf0, 0x90, 0xf0], // 8
+            [0xf0, 0x90, 0xf0, 0x10, 0xf0], // 9
+            [0xf0, 0x90, 0xf0, 0x90, 0x90], // A
+            [0xe0, 0x90, 0xe0, 0x90, 0xe0], // B
+            [0xf0, 0x80, 0x80, 0x80, 0xf0], // C
+            [0xe0, 0x90, 0x90, 0x90, 0xe0], // D
+            [0xf0, 0x80, 0xf0, 0x80, 0xf0], // E
+            [0xf0, 0x80, 0xf0, 0x80, 0x80], // F
+        ]
+        .as_flattened();
+        self.ram[0x00..numbers.len()].copy_from_slice(&numbers);
     }
 
     fn next_opcode(&mut self) -> Result<u16> {
@@ -159,6 +195,25 @@ where
             .ok_or(VmError::InvalidAddress(self.pc));
         self.pc += 1;
         res
+    }
+
+    #[inline]
+    fn write_byte_at(&mut self, addr: u16, value: u8) -> Result<()> {
+        let slot = self
+            .ram
+            .get_mut(addr as usize)
+            .ok_or(VmError::InvalidAddress(addr))?;
+        *slot = value;
+
+        Ok(())
+    }
+
+    #[inline]
+    fn read_byte_at(&mut self, addr: u16) -> Result<u8> {
+        self.ram
+            .get(addr as usize)
+            .copied()
+            .ok_or(VmError::InvalidAddress(addr))
     }
 
     fn exec_clear_screen(&mut self) -> Result<()> {
@@ -242,6 +297,14 @@ where
 
     fn exec_skip_if_equal_vx_vy(&mut self, vx: u8, vy: u8) -> Result<()> {
         if self.v_registers[vx as usize] == self.v_registers[vy as usize] {
+            self.pc += 2;
+        }
+
+        Ok(())
+    }
+
+    fn exec_skip_if_not_equal_vx_vy(&mut self, vx: u8, vy: u8) -> Result<()> {
+        if self.v_registers[vx as usize] != self.v_registers[vy as usize] {
             self.pc += 2;
         }
 
@@ -369,6 +432,62 @@ where
         self.sound = self.v_registers[vx as usize];
         Ok(())
     }
+
+    fn exec_store_registers(&mut self, vx: u8) -> Result<()> {
+        for i in 0..=vx as usize {
+            self.write_byte_at(self.i_register, self.v_registers[i])?;
+            self.i_register += 1;
+        }
+
+        Ok(())
+    }
+
+    fn exec_load_registers(&mut self, vx: u8) -> Result<()> {
+        for i in 0..=vx as usize {
+            self.v_registers[i] = self.read_byte_at(self.i_register)?;
+            self.i_register += 1;
+        }
+
+        Ok(())
+    }
+
+    fn exec_call(&mut self, addr: u16) -> Result<()> {
+        self.stack.push(self.pc);
+        self.pc = addr;
+        Ok(())
+    }
+
+    fn exec_return(&mut self) -> Result<()> {
+        self.pc = self.stack.pop().ok_or(VmError::EmptyStack)?;
+        Ok(())
+    }
+
+    fn exec_add_i(&mut self, vx: u8) -> Result<()> {
+        self.i_register += self.v_registers[vx as usize] as u16;
+        Ok(())
+    }
+
+    fn exec_bcd(&mut self, vx: u8) -> Result<()> {
+        let mut value = self.v_registers[vx as usize];
+        let hundreds = value / 100;
+        value -= hundreds * 100;
+        let tens = value / 10;
+        value -= tens * 10;
+
+        self.write_byte_at(self.i_register, hundreds)?;
+        self.write_byte_at(self.i_register + 1, tens)?;
+        self.write_byte_at(self.i_register + 2, value)?;
+
+        Ok(())
+    }
+
+    fn exec_load_digit(&mut self, vx: u8) -> Result<()> {
+        let nibble = self.v_registers[vx as usize] & 0x0f;
+        let addr = nibble as u16 * 5;
+        self.i_register = addr;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -475,6 +594,26 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.v_registers[0xa], 0x11 + 0xbc);
+    }
+
+    #[test]
+    fn opcode_skip_if_not_equal_vx_vy() {
+        let rom = [0x90, 0x10];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0x00;
+        vm.v_registers[0x1] = 0x01;
+
+        let mut res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x204);
+
+        vm.pc = 0x200;
+        vm.v_registers[0x0] = 0x01;
+        res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
     }
 
     #[test]
@@ -879,5 +1018,101 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(vm.pc, 0x202);
         assert_eq!(vm.sound, 0xab);
+    }
+
+    #[test]
+    fn opcode_store_registers() {
+        let rom = [0xf2, 0x55];
+        let mut vm = any_vm(&rom);
+        vm.i_register = 0x300;
+        vm.v_registers[0x0..0x03].copy_from_slice(&[0xa, 0xb, 0xc]);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.i_register, 0x303);
+        assert_eq!(vm.ram[0x300..0x303], [0xa, 0xb, 0xc]);
+    }
+
+    #[test]
+    fn opcode_load_registers() {
+        let rom = [0xf2, 0x65];
+        let mut vm = any_vm(&rom);
+        vm.i_register = 0x300;
+        vm.ram[0x300..0x303].copy_from_slice(&[0xa, 0xb, 0xc]);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.i_register, 0x303);
+        assert_eq!(vm.v_registers[0..3], [0xa, 0xb, 0xc]);
+    }
+
+    #[test]
+    fn opcode_call() {
+        let rom = [0x23, 0x00];
+        let mut vm = any_vm(&rom);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.stack.len(), 1);
+        assert_eq!(vm.pc, 0x300);
+    }
+
+    #[test]
+    fn opcode_ret() {
+        let rom = [0x00, 0xee];
+        let mut vm = any_vm(&rom);
+        vm.stack.push(0x300);
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert!(vm.stack.is_empty());
+        assert_eq!(vm.pc, 0x300);
+    }
+
+    #[test]
+    fn opcode_bcd() {
+        let rom = [0xf0, 0x33];
+        let mut vm = any_vm(&rom);
+        vm.i_register = 0x300;
+        vm.v_registers[0x0] = 128;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.ram[0x300..0x303], [1, 2, 8]);
+    }
+
+    #[test]
+    fn opcode_load_digit() {
+        let rom = [0xf0, 0x29];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0xab;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.i_register, 0xb * 5);
+    }
+
+    #[test]
+    fn opcode_add_i() {
+        let rom = [0xf0, 0x1e];
+        let mut vm = any_vm(&rom);
+        vm.v_registers[0x0] = 0xab;
+        vm.i_register = 0x300;
+
+        let res = vm.tick();
+
+        assert!(res.is_ok());
+        assert_eq!(vm.pc, 0x202);
+        assert_eq!(vm.i_register, 0x3ab);
     }
 }
