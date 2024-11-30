@@ -2,9 +2,9 @@ import wasmInit, { loadRom, Emu } from "chip8";
 import Buzzer from "./audio";
 
 const ROMS = [
-  { name: "poker.ch8", url: "/roms/poker.ch8" },
-  { name: "wait_for_key.ch8", url: "/roms/wait_for_key.ch8" },
-  { name: "buzz.ch8", url: "/roms/buzz.ch8" },
+  { name: "poker.ch8", url: "roms/poker.ch8" },
+  { name: "wait_for_key.ch8", url: "roms/wait_for_key.ch8" },
+  { name: "buzz.ch8", url: "roms/buzz.ch8" },
 ];
 const DISPLAY_LEN = 64 * 32;
 const THEMES = [
