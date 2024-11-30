@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + TS</title>
+    <script type="module" crossorigin src="/assets/index-CrcuOr9C.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CThwa4A8.css">
+  </head>
+  <body>
+    <div class="main-wrapper">
+      <header>
+        <h1>🤖 CHIP-8</h1>
+      </header>
+      <main>
+        <canvas id="chip8-canvas" width="64" height="32"></canvas>
+        <footer>
+          <p>
+            <label>Select ROM
+              <select id="chip8-rom-selector">
+                <option disabled selected>No ROM loaded</option>
+              </select>
+            </label>
+          </p>
+          <details open>
+            <summary>Config</summary>
+            <p><label><input type="checkbox" checked id="chip8-config-audio">Audio</label></p>
+            <p>
+              <label>Instructions per frame
+                <input type="number" min="1" max="30" value="16" id="chip8-ipf-selector"/>
+              </label>
+              <small>(<span id="chip8-config-ips">0</span> instructions/second)</small>
+            </p>
+            <p>
+              <label>Theme
+                <select id="chip8-config-theme-selector"></select>
+              </label>
+            </p>
+          </details>
+        </footer>
+      </main>
+      <footer>
+        <p>Crafted with 🖤 by <a href="https://ladybenko">ladybenko</a>.</p>
+      </footer>
+    </div>
+  </body>
+</html>

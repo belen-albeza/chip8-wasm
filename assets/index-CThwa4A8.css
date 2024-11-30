@@ -1,0 +1,1 @@
+body{background:#ccc;display:grid;place-content:center;min-height:50vh}#chip8-canvas{image-rendering:crisp-edges;image-rendering:pixelated;width:512px;background:#000}
